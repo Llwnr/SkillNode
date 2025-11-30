@@ -1,0 +1,470 @@
+﻿
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\Config\FramerateManager.cs
+================================================================================
+
+using System;
+using UnityEngine;
+
+public class FramerateManager : MonoBehaviour {
+    public int frameRate = 30;
+    private void Start() {
+        Application.targetFrameRate = frameRate;
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\SkillData.cs
+================================================================================
+
+[System.Serializable]
+public class SkillData {
+    public string Name;
+    public float Power;
+    public string Element;
+    public float Cost;
+
+    public SkillData Clone() {
+        return new SkillData{
+            Name = this.Name,
+            Power = this.Power,
+            Element = this.Element,
+            Cost = this.Cost
+        };
+    }
+
+    public override string ToString() {
+        return $"{Name}, D: {Power}, Cost: {Cost}, [{Element}]";
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\SkillNodeInstance.cs
+================================================================================
+
+using System;
+using System.Collections.Generic;
+using JetBrains.Annotations;
+using UnityEngine;
+
+public class SkillNodeInstance : MonoBehaviour {
+    [SerializeField]private SkillNode skillNode;
+    public SkillData SkillData => skillNode.Data;
+    [SerializeField] private GameObject connectionPort;
+    [SerializeField] private SkillNodeUI skillNodeUI;
+    
+    [SerializeField] private Transform outputSpawnPoint; // Assign a transform in the inspector where children appear
+    private SkillNodeInstance _skillNodePrefab;
+
+    //NODE LOGIC RELATED STUFF
+    private ModifierNode _connectedModifier;
+    private List<SkillNodeInstance> _nextNodes = new  List<SkillNodeInstance>();
+    
+    public void Init(SkillNode skillNode, SkillNodeInstance skillNodePrefab) {
+        this.skillNode = Instantiate(skillNode);
+        _skillNodePrefab =  skillNodePrefab;
+        skillNodeUI.UpdateVisuals();
+    }
+
+    //Activated when an object with modifierInstance is dropped onto the connectionPort
+    public void AttachModifier(ModifierNode modifierNode) {
+        skillNode.ConnectedModifier = modifierNode;
+        
+        Debug.Log($"Attached modifier: {modifierNode}");
+        
+        var nextNodes = skillNode.GetNextNodes();
+    
+        // 2. Clear old outputs if any exist
+        foreach(Transform child in outputSpawnPoint) {
+            Destroy(child.gameObject);
+        }
+
+        // 3. Spawn the new visual nodes
+        if (nextNodes != null) {
+            foreach (var nodeData in nextNodes) {
+                SkillNodeInstance newNode = Instantiate(_skillNodePrefab, outputSpawnPoint);
+                newNode.Init(nodeData, _skillNodePrefab);
+            }
+        }
+
+        _connectedModifier = modifierNode;
+        List<SkillData> nextNodesDatas = GetDataForNextNodes();
+    }
+
+    [CanBeNull]
+    List<SkillData> GetDataForNextNodes() {
+        if (_connectedModifier == null) return null;
+
+        return _connectedModifier.CalculateOutputs(skillNode.Data);
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\SkillNodeManager.cs
+================================================================================
+
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class SkillNodeManager : MonoBehaviour{
+    [SerializeField]List<SkillNode> skillInventory = new List<SkillNode>();
+    [SerializeField]List<ModifierNode> modifierInventory = new List<ModifierNode>();
+    [SerializeField] private SkillNodeInstance skillNodeInstancePrefab;
+    [SerializeField] private ModifierNodeInstance modifierNodeInstancePrefab;
+    [SerializeField] private GameObject skillNodeContainer, modifierNodeContainer;
+    
+    private void Start() {
+        InstantiateNodes();
+    }
+
+    void InstantiateNodes() {
+        foreach (var skillNode in skillInventory) {
+            SkillNodeInstance newSkillNode = Instantiate(skillNodeInstancePrefab, skillNodeContainer.transform);
+            newSkillNode.Init(skillNode, skillNodeInstancePrefab);
+        }
+
+        foreach (var modifierNode in modifierInventory) {
+            ModifierNodeInstance newModifierNode = Instantiate(modifierNodeInstancePrefab, modifierNodeContainer.transform);
+            newModifierNode.Init(modifierNode);
+        }
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Modifiers\FireElementModifier.cs
+================================================================================
+
+using System.Collections.Generic;
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "FireElement", menuName = "ModifierNode/FireElement")]
+public class FireElementModifier : ModifierNode {
+    public override List<SkillNode> CalculateOutputs(SkillNode inputSkillNode){
+        var outputNodes = new List<SkillNode>();
+        SkillData inputData =  inputSkillNode.Data;
+
+        // Logic: Mutate data to be Fire
+        var dataC = inputData.Clone();
+        dataC.Cost += 1;
+        dataC.Element = "Fire";
+        dataC.Name = dataC.Name.Replace("B", "C"); // Just to match your diagram naming
+
+        // Create the Output Node (Fireball C)
+        SkillNode nodeC = UnityEngine.Object.Instantiate(inputSkillNode);
+        nodeC.Init(dataC);
+            
+        outputNodes.Add(nodeC);
+
+        return outputNodes;
+    }
+
+    public override List<SkillData> CalculateOutputs(SkillData inputData) {
+        SkillData modifiedData = inputData.Clone();
+        modifiedData.Element = "Fire";
+        modifiedData.Name += "C";
+        
+        return new List<SkillData>{modifiedData};
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Modifiers\ModifierNode.cs
+================================================================================
+
+using System.Collections.Generic;
+using UnityEngine;
+
+public abstract class ModifierNode : ScriptableObject{
+    // This function takes raw data and turns it into the Next Skill Nodes
+    public abstract List<SkillNode> CalculateOutputs(SkillNode inputSkillNode);
+    public abstract List<SkillData> CalculateOutputs(SkillData inputData);
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Modifiers\ModifierNodeInstance.cs
+================================================================================
+
+using System.Collections.Generic;
+using UnityEngine;
+
+public class ModifierNodeInstance : MonoBehaviour {
+    private List<SkillNodeInstance> _outputNodes = new List<SkillNodeInstance>();
+    [SerializeField] private ModifierNode modifierNode;
+    public ModifierNode ModifierNode => modifierNode;
+    [SerializeField] private ModifierItemUI modifierItemUI;
+    
+    public void Init(ModifierNode modifierNode) {
+        this.modifierNode = Instantiate(modifierNode);
+        modifierItemUI.UpdateVisuals();
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Modifiers\SplitterModifier.cs
+================================================================================
+
+using System.Collections.Generic;
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "SplitterMod", menuName = "ModifierNode/SplitterMod")]
+public class SplitterModifier : ModifierNode{
+    public override List<SkillNode> CalculateOutputs(SkillNode inputSkillNode) {
+        var outputNodes = new List<SkillNode>();
+        SkillData inputData = inputSkillNode.Data;
+        
+        SkillData modifiedData = inputData.Clone();
+        modifiedData.Cost += 2;
+        modifiedData.Cost *= 0.5f;
+        modifiedData.Power *= 0.6f;
+
+        // Logic: Create Fireball A (Top Branch)
+        var dataA = modifiedData.Clone();
+        dataA.Name += " A";
+        SkillNode nodeA = ScriptableObject.Instantiate(inputSkillNode);
+        nodeA.Init(dataA);
+        outputNodes.Add(nodeA);
+
+        // Logic: Create Fireball B (Bottom Branch)
+        var dataB = modifiedData.Clone();
+        dataB.Name += " B";
+        SkillNode nodeB = ScriptableObject.Instantiate(inputSkillNode);
+        nodeB.Init(dataB);
+        outputNodes.Add(nodeB);
+
+
+        Debug.Log($"SplitterMod outputs: {outputNodes.Count}");
+        return outputNodes;
+    }
+
+    public override List<SkillData> CalculateOutputs(SkillData inputData) {
+        var outputDatas = new List<SkillData>();
+        // Logic: Create Fireball A (Top Branch)
+        var dataA = inputData.Clone();
+        dataA.Name += " A";
+        outputDatas.Add(dataA);
+
+        // Logic: Create Fireball B (Bottom Branch)
+        var dataB = inputData.Clone();
+        dataB.Name += " B";
+        outputDatas.Add(dataB);
+
+        return outputDatas;
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Skills\FireballNode.cs
+================================================================================
+
+using System;
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "Fireball", menuName = "SkillNode/Fireball")]
+public class FireballNode : SkillNode{
+    public override void Activate() {
+        Console.WriteLine($"Fireball activated. {Data}");
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Skills\SkillNode.cs
+================================================================================
+
+using System;
+using System.Collections.Generic;
+using JetBrains.Annotations;
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "SkillNode", menuName = "SkillNode/")]
+public abstract class SkillNode : ScriptableObject {
+    [SerializeField]
+    private SkillData _data;
+    public SkillData Data => _data;
+    public ModifierNode ConnectedModifier; // The single connection
+    
+    public void Init(SkillData data) {
+        _data =  data;
+    }
+    
+    public abstract void Activate();
+
+    // RECURSIVE FUNCTION: This is the magic that finds the leaves.
+    public List<SkillNode> GetLeaves() {
+        // Base Case: If there is no modifier, THIS is a leaf node.
+        if (ConnectedModifier == null) {
+            return new List<SkillNode> { this };
+        }
+
+        List<SkillNode> leaves = new List<SkillNode>();
+
+        //Modifier calculates the next step
+        List<SkillNode> outputs = ConnectedModifier.CalculateOutputs(this);
+
+        // Recursive Step
+        foreach (var outputNode in outputs) {
+            leaves.AddRange(outputNode.GetLeaves());
+        }
+
+        return leaves;
+    }
+
+    [CanBeNull]
+    public List<SkillNode>  GetNextNodes() {
+        if (ConnectedModifier == null) {
+            return null;
+        }
+        
+        return ConnectedModifier.CalculateOutputs(this);
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\DragDropSystem\Draggable.cs
+================================================================================
+
+using System;
+using UnityEngine;
+using UnityEngine.EventSystems;
+
+public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler{
+    private RectTransform _rectTransform;
+    private CanvasGroup _canvasGroup;
+    private Vector3 _startPosition;
+    private Transform _startParent;
+
+    private void Awake(){
+        _rectTransform =  GetComponent<RectTransform>();
+        _canvasGroup =  GetComponent<CanvasGroup>();
+        if (_canvasGroup == null){
+            _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+        }
+    }
+
+    public void OnBeginDrag(PointerEventData eventData){
+        _startPosition = _rectTransform.position;
+        _startParent = transform.parent;
+        _canvasGroup.alpha = 0.6f;
+        _canvasGroup.blocksRaycasts = false;
+        transform.SetParent(transform.root);
+    }
+
+    public void OnDrag(PointerEventData eventData){
+        transform.position = Input.mousePosition;
+    }
+
+    public void OnEndDrag(PointerEventData eventData){
+        _canvasGroup.alpha = 1f;
+        _canvasGroup.blocksRaycasts = true;
+        if (transform.parent == transform.root){
+            transform.position = _startPosition;
+            transform.SetParent(_startParent);
+        }
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\DragDropSystem\DropZone.cs
+================================================================================
+
+using UnityEngine;
+using UnityEngine.EventSystems;
+
+public abstract class DropZone : MonoBehaviour, IDropHandler {
+    [SerializeField] private int capacity = 1;
+
+    public abstract bool Condition(PointerEventData eventData);
+    public abstract void Action(PointerEventData eventData);
+
+    public void OnDrop(PointerEventData eventData) {
+        if (transform.childCount >= capacity) return;
+        if (Condition(eventData)) {
+            Action(eventData);
+        }
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\DragDropSystem\ModifierDropZone.cs
+================================================================================
+
+using UnityEngine;
+using UnityEngine.EventSystems;
+
+public class ModifierDropZone : DropZone{
+    public override bool Condition(PointerEventData eventData) {
+        return (eventData.pointerDrag != null && eventData.pointerDrag.GetComponent<ModifierItemUI>() != null);
+    }
+
+    public override void Action(PointerEventData eventData) {
+        Draggable draggable = eventData.pointerDrag.GetComponent<Draggable>();
+        if (draggable != null) {
+            eventData.pointerDrag.transform.SetParent(transform);
+        }
+        
+        ModifierNodeInstance instance = eventData.pointerDrag.GetComponent<ModifierNodeInstance>();
+        if (instance != null) {
+            instance.GetComponentInParent<SkillNodeInstance>()?.AttachModifier(instance.ModifierNode);
+        }
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\DragDropSystem\SkillNodeDropZone.cs
+================================================================================
+
+using UnityEngine.EventSystems;
+
+public class SkillNodeDropZone : DropZone{
+    public override bool Condition(PointerEventData eventData) {
+        return (eventData.pointerDrag != null && eventData.pointerDrag.GetComponent<SkillNodeUI>() != null);
+    }
+
+    public override void Action(PointerEventData eventData) {
+        Draggable draggable = eventData.pointerDrag.GetComponent<Draggable>();
+        if (draggable != null) {
+            eventData.pointerDrag.transform.SetParent(transform);
+        }
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\SkillSystemUI\ModifierItemUI.cs
+================================================================================
+
+using TMPro;
+using UnityEngine;
+
+public class ModifierItemUI : MonoBehaviour {
+    [SerializeField] private TextMeshProUGUI nameBox;
+    [SerializeField] private ModifierNodeInstance associatedModifierNode;
+
+    public void UpdateVisuals() {
+        ModifierNode modNode = associatedModifierNode.ModifierNode;
+
+        nameBox.text = modNode.name;
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\SkillSystemUI\SkillNodeUI.cs
+================================================================================
+
+using TMPro;
+using UnityEngine;
+
+public class SkillNodeUI : MonoBehaviour{
+    [SerializeField]private SkillNodeInstance associatedNodeInstance;
+    [SerializeField] private TextMeshProUGUI nameBox, pwrBox, costBox;
+
+    
+    public void UpdateVisuals() {
+        SkillData skillData = associatedNodeInstance.SkillData;
+        
+        nameBox.text = skillData.Name;
+        pwrBox.text = skillData.Power.ToString("F00");
+        costBox.text = skillData.Cost.ToString("F00");
+    }
+    
+    
+}

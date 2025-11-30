@@ -12,9 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4f6c396d64a143a0bdc4fa68c2c64650, type: 3}
   m_Name: Fireball
   m_EditorClassIdentifier: 
-  _data:
+  _defaultData:
     Name: Fireball
-    Power: 10
+    Power: 50
     Element: 
     Cost: 2
-  ConnectedModifier: {fileID: 0}

@@ -8,6 +8,8 @@ public class SkillNodeManager : MonoBehaviour{
     [SerializeField] private SkillNodeInstance skillNodeInstancePrefab;
     [SerializeField] private ModifierNodeInstance modifierNodeInstancePrefab;
     [SerializeField] private GameObject skillNodeContainer, modifierNodeContainer;
+
+    private List<SkillNodeInstance> _instances = new List<SkillNodeInstance>();
     
     private void Start() {
         InstantiateNodes();
@@ -15,13 +17,20 @@ public class SkillNodeManager : MonoBehaviour{
 
     void InstantiateNodes() {
         foreach (var skillNode in skillInventory) {
-            SkillNodeInstance newSkillNode = Instantiate(skillNodeInstancePrefab, skillNodeContainer.transform);
-            newSkillNode.Init(skillNode, skillNodeInstancePrefab);
+            SkillNodeInstance newSkillInstance = Instantiate(skillNodeInstancePrefab, skillNodeContainer.transform);
+            newSkillInstance.Init(skillNode, skillNode.DefaultData.Clone(), skillNodeInstancePrefab);
+            _instances.Add(newSkillInstance);
         }
 
         foreach (var modifierNode in modifierInventory) {
             ModifierNodeInstance newModifierNode = Instantiate(modifierNodeInstancePrefab, modifierNodeContainer.transform);
             newModifierNode.Init(modifierNode);
+        }
+    }
+
+    public void Activate() {
+        foreach (var skill in _instances) {
+            skill.Activate();
         }
     }
 }

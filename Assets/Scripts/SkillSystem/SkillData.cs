@@ -15,6 +15,6 @@ public class SkillData {
     }
 
     public override string ToString() {
-        return $"{Name}, D: {Power}, Cost: {Cost}, [{Element}]";
+        return $"{Name}, Power: {Power}, Cost: {Cost}, Element: [{Element}]";
     }
 }

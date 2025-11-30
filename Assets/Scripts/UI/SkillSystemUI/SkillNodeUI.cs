@@ -7,7 +7,7 @@ public class SkillNodeUI : MonoBehaviour{
 
     
     public void UpdateVisuals() {
-        SkillData skillData = associatedNodeInstance.SkillData;
+        SkillData skillData = associatedNodeInstance.RuntimeData;
         
         nameBox.text = skillData.Name;
         pwrBox.text = skillData.Power.ToString("F00");

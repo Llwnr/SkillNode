@@ -3,31 +3,22 @@ using UnityEngine;
 
 [CreateAssetMenu(fileName = "SplitterMod", menuName = "ModifierNode/SplitterMod")]
 public class SplitterModifier : ModifierNode{
-    public override List<SkillNode> CalculateOutputs(SkillNode inputSkillNode) {
-        var outputNodes = new List<SkillNode>();
-        SkillData inputData = inputSkillNode.Data;
-        
-        SkillData modifiedData = inputData.Clone();
-        modifiedData.Cost += 2;
-        modifiedData.Cost *= 0.5f;
-        modifiedData.Power *= 0.6f;
-
+    public override List<SkillData> CalculateOutputs(SkillData inputData) {
+        var outputDatas = new List<SkillData>();
         // Logic: Create Fireball A (Top Branch)
-        var dataA = modifiedData.Clone();
+        var dataA = inputData.Clone();
         dataA.Name += " A";
-        SkillNode nodeA = ScriptableObject.Instantiate(inputSkillNode);
-        nodeA.Init(dataA);
-        outputNodes.Add(nodeA);
+        dataA.Power *= 0.6f;
+        dataA.Cost *= 0.5f;
+        outputDatas.Add(dataA);
 
         // Logic: Create Fireball B (Bottom Branch)
-        var dataB = modifiedData.Clone();
+        var dataB = inputData.Clone();
         dataB.Name += " B";
-        SkillNode nodeB = ScriptableObject.Instantiate(inputSkillNode);
-        nodeB.Init(dataB);
-        outputNodes.Add(nodeB);
+        dataB.Power *= 0.6f;
+        dataB.Cost *= 0.5f;
+        outputDatas.Add(dataB);
 
-
-        Debug.Log($"SplitterMod outputs: {outputNodes.Count}");
-        return outputNodes;
+        return outputDatas;
     }
 }
