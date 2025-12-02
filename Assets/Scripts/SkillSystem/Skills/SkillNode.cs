@@ -7,7 +7,7 @@ using UnityEngine;
 public abstract class SkillNode : ScriptableObject {
     [SerializeField]
     private SkillData _defaultData;
-    public SkillData DefaultData => _defaultData;
+    public SkillData DefaultData => _defaultData.Clone();
     
     public abstract void Execute(SkillData skillData);
 }

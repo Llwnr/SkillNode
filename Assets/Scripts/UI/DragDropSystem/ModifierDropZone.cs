@@ -8,13 +8,11 @@ public class ModifierDropZone : DropZone{
 
     public override void Action(PointerEventData eventData) {
         Draggable draggable = eventData.pointerDrag.GetComponent<Draggable>();
-        if (draggable != null) {
-            eventData.pointerDrag.transform.SetParent(transform);
-        }
-        
         ModifierNodeInstance instance = eventData.pointerDrag.GetComponent<ModifierNodeInstance>();
-        if (instance != null) {
-            instance.GetComponentInParent<SkillNodeInstance>()?.AttachModifier(instance.ModifierNode);
+        
+        if (instance != null && draggable != null) {
+            eventData.pointerDrag.transform.SetParent(transform);
+            instance.GetComponentInParent<SkillNodeInstance>()?.AttachModifier(instance);
         }
     }
 }

@@ -8,6 +8,12 @@ public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDra
     private Vector3 _startPosition;
     private Transform _startParent;
 
+    public Action OnDragStart;
+
+    public void SetStartParent(Transform startParent) {
+        _startParent = startParent;
+    }
+    
     private void Awake(){
         _rectTransform =  GetComponent<RectTransform>();
         _canvasGroup =  GetComponent<CanvasGroup>();
@@ -22,6 +28,8 @@ public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDra
         _canvasGroup.alpha = 0.6f;
         _canvasGroup.blocksRaycasts = false;
         transform.SetParent(transform.root);
+
+        OnDragStart?.Invoke();
     }
 
     public void OnDrag(PointerEventData eventData){

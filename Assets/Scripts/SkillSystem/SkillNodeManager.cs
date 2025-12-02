@@ -18,7 +18,7 @@ public class SkillNodeManager : MonoBehaviour{
     void InstantiateNodes() {
         foreach (var skillNode in skillInventory) {
             SkillNodeInstance newSkillInstance = Instantiate(skillNodeInstancePrefab, skillNodeContainer.transform);
-            newSkillInstance.Init(skillNode, skillNode.DefaultData.Clone(), skillNodeInstancePrefab);
+            newSkillInstance.Init(skillNode, skillNode.DefaultData.Clone(), skillNodeInstancePrefab, modifierNodeContainer.transform);
             _instances.Add(newSkillInstance);
         }
 
