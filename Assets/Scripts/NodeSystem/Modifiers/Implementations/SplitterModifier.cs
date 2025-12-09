@@ -15,9 +15,9 @@ public class SplitterModifier : ModifierNode
             splitData.Name += "Split " + 1f/numOfSplits + " ";
             splitData.Power *= powerMult;
             splitData.Cost *= costMult;
+            splitData.Cost += costMult * cost;
             outputDatas.Add(splitData);
         }
-
         return outputDatas;
     }
 }

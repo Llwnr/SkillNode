@@ -12,3 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 17edb6f49acf43b2bc1648bb3b7a19d4, type: 3}
   m_Name: FireElement
   m_EditorClassIdentifier: 
+  name: Fire Infusion
+  cost: 1
+  powerBoost: 5

@@ -1,18 +1,21 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
+[Serializable]
 public class ActionSkill : IExecutable{
-    private SkillNode _skillNode;
-    private List<SkillData> _skillDatas;
+    private SkillNode _skillNode; 
+    public SkillNode SkillNode => _skillNode;
+    public List<SkillData> skillDatas;
 
     public ActionSkill(SkillNode skillNode, List<SkillData> skillDatas) {
         _skillNode = skillNode;
-        _skillDatas = skillDatas;
+        this.skillDatas = skillDatas;
     }
 
     //You would include logic here, such as if enemy has vulnerable then increase the skill's power by 50%.
-    public void Execute(string someTargetContexts) {
-        foreach (var skillData in _skillDatas) {
-            _skillNode.Execute(skillData);
+    public void Execute(SkillExecutionContext context) {
+        foreach (var skillData in skillDatas) {
+            _skillNode.Execute(context, skillData);
         }
     }
 }

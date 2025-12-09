@@ -34,7 +34,9 @@ public class SkillData {
             Name = this.Name,
             Power = this.Power,
             Element = this.Element,
-            Cost = this.Cost
+            Cost = this.Cost,
+            stats = stats,
+            listStats = listStats
         };
     }
 

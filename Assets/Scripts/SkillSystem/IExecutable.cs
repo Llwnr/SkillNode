@@ -1,4 +1,4 @@
 ﻿
 public interface IExecutable {
-    public void Execute(string someTargetContexts);
+    public void Execute(SkillExecutionContext context);
 }

@@ -12,11 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4f6c396d64a143a0bdc4fa68c2c64650, type: 3}
   m_Name: Fireball
   m_EditorClassIdentifier: 
-  _defaultData:
+  name: Fireball
+  baseData:
     Name: Fireball
-    Power: 50
+    Power: 5
     Element: 
-    Cost: 2
+    Cost: 1
     stats:
       m_keys: []
       m_values: []

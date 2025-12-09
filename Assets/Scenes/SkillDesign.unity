@@ -240,6 +240,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   skillNodeManager: {fileID: 319801239}
+  skillInventory: {fileID: 11400000, guid: 9da3ad72f2bdc86429f1eaa6ad2ea05b, type: 2}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -1045,7 +1046,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 319801240}
         m_TargetAssemblyTypeName: FinalSkillCompiler, Assembly-CSharp
-        m_MethodName: GetAllActionSkills
+        m_MethodName: CompileAndMoveToNextScene
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

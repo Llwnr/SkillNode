@@ -18,9 +18,7 @@ public class SkillNodeManager : MonoBehaviour{
 
     void InstantiateNodes() {
         foreach (var skillNode in skillInventory) {
-            SkillNodeInstance newSkillInstance = Instantiate(skillNodeInstancePrefab, skillNodeContainer.transform);
-            newSkillInstance.Init(skillNode, skillNode.DefaultData.Clone(), skillNodeInstancePrefab, modifierNodeContainer.transform);
-            _instances.Add(newSkillInstance);
+            InstantiateNodeInstance(skillNode);
         }
 
         foreach (var modifierNode in modifierInventory) {
@@ -29,9 +27,9 @@ public class SkillNodeManager : MonoBehaviour{
         }
     }
 
-    public void Activate() {
-        foreach (var skill in _instances) {
-            skill.Activate();
-        }
+    private void InstantiateNodeInstance(SkillNode skillNode) {
+        SkillNodeInstance newSkillInstance = Instantiate(skillNodeInstancePrefab, skillNodeContainer.transform);
+        newSkillInstance.Init(skillNode);
+        _instances.Add(newSkillInstance);
     }
 }
