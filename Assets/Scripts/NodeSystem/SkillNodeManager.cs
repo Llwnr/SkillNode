@@ -10,6 +10,7 @@ public class SkillNodeManager : MonoBehaviour{
     [SerializeField] private GameObject skillNodeContainer, modifierNodeContainer;
 
     private List<SkillNodeInstance> _instances = new List<SkillNodeInstance>();
+    public List<SkillNodeInstance> Instances => _instances;
     
     private void Start() {
         InstantiateNodes();

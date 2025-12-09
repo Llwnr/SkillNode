@@ -5,6 +5,7 @@ using UnityEngine;
 
 public class SkillNodeInstance : MonoBehaviour {
     [SerializeField]private SkillNode sourceSkillNode;
+    public SkillNode SourceSkillNode => sourceSkillNode;
     [SerializeField] private GameObject connectionPort;
     private Transform _modifiersOrigContainer;
     
@@ -34,29 +35,31 @@ public class SkillNodeInstance : MonoBehaviour {
         
         _connectedModifierInstance = modifier;
         _connectedModifierInstance.GetComponent<Draggable>().OnDragStart += ClearChildNodes;
-        List<SkillData> nextNodesDatas = modifier.ModifierNode.CalculateOutputs(RuntimeData);
+        List<SkillData> nextNodesDatas = modifier.ModifierNode.Process(RuntimeData);
 
+        int totalNewNodes = nextNodesDatas.Count;
         for (int i = 0; i < nextNodesDatas.Count; i++) {
             SkillNodeInstance newInstance = Instantiate(_skillNodePrefab, transform.parent);
             newInstance.Init(sourceSkillNode, nextNodesDatas[i], _skillNodePrefab, _modifiersOrigContainer);
-            newInstance.transform.position = transform.position + new Vector3(200, (i+1)*100, 0);
-            
+            newInstance.transform.position = transform.position + new Vector3(200, (i-(totalNewNodes-1)*0.5f)*200, 0);
             _childrenNodeInstances.Add(newInstance);
         }
     }
 
     void ClearChildNodes() {
         foreach (var nodeInstance in _childrenNodeInstances) {
+            nodeInstance.ClearChildNodes();
             Destroy(nodeInstance.gameObject);
         }
         _childrenNodeInstances.Clear();
-
         DetatchModifier();
     }
 
     void DetatchModifier() {
         if (_connectedModifierInstance) {
+            Debug.Log($"Detatching the modifier: {_connectedModifierInstance.ModifierNode.name}");
             _connectedModifierInstance.GetComponent<Draggable>().OnDragStart -= ClearChildNodes;
+            _connectedModifierInstance.transform.SetParent(_modifiersOrigContainer);
             _connectedModifierInstance.GetComponent<Draggable>().SetStartParent(_modifiersOrigContainer);
             _connectedModifierInstance = null;
         }

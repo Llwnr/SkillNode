@@ -1,0 +1,12 @@
+Fireball
+	Fireball, Power: 50, Cost: 2, Element: []
+--- End of Skill ---
+
+Fireball
+	Fireball C C C, Power: 50, Cost: 5, Element: [Fire]
+--- End of Skill ---
+
+Fireball
+	Fireball C, Power: 50, Cost: 3, Element: [Fire]
+--- End of Skill ---
+

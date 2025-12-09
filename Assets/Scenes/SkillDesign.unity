@@ -177,6 +177,7 @@ GameObject:
   m_Component:
   - component: {fileID: 319801238}
   - component: {fileID: 319801239}
+  - component: {fileID: 319801240}
   m_Layer: 0
   m_Name: NodeManager
   m_TagString: Untagged
@@ -212,14 +213,33 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   skillInventory:
   - {fileID: 11400000, guid: 5de2205ced8569d41ad5ae71645fd4e6, type: 2}
+  - {fileID: 11400000, guid: 5de2205ced8569d41ad5ae71645fd4e6, type: 2}
+  - {fileID: 11400000, guid: 5de2205ced8569d41ad5ae71645fd4e6, type: 2}
   modifierInventory:
   - {fileID: 11400000, guid: bc097575284e18c4688a8b39fed2fcb5, type: 2}
+  - {fileID: 11400000, guid: 6754945de77de9349ad7fcfc08aba65f, type: 2}
+  - {fileID: 11400000, guid: bc097575284e18c4688a8b39fed2fcb5, type: 2}
+  - {fileID: 11400000, guid: bc097575284e18c4688a8b39fed2fcb5, type: 2}
+  - {fileID: 11400000, guid: 6754945de77de9349ad7fcfc08aba65f, type: 2}
   - {fileID: 11400000, guid: 6754945de77de9349ad7fcfc08aba65f, type: 2}
   - {fileID: 11400000, guid: bc097575284e18c4688a8b39fed2fcb5, type: 2}
   skillNodeInstancePrefab: {fileID: 9167254695882157185, guid: 91f5b041eec8ef04eb616f9fc7361c11, type: 3}
   modifierNodeInstancePrefab: {fileID: 4089504169783652732, guid: 1b57fc410643f8949bfbac2b8e6ef248, type: 3}
   skillNodeContainer: {fileID: 1244847072}
   modifierNodeContainer: {fileID: 1137704113}
+--- !u!114 &319801240
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 319801237}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a9ec29ea78864135ad57eb9f8454be1d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  skillNodeManager: {fileID: 319801239}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -1023,9 +1043,9 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 319801239}
-        m_TargetAssemblyTypeName: SkillNodeManager, Assembly-CSharp
-        m_MethodName: Activate
+      - m_Target: {fileID: 319801240}
+        m_TargetAssemblyTypeName: FinalSkillCompiler, Assembly-CSharp
+        m_MethodName: GetAllActionSkills
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

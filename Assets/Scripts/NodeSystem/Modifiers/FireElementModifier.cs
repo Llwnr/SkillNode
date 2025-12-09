@@ -3,7 +3,7 @@ using UnityEngine;
 
 [CreateAssetMenu(fileName = "FireElement", menuName = "ModifierNode/FireElement")]
 public class FireElementModifier : ModifierNode {
-    public override List<SkillData> CalculateOutputs(SkillData inputData) {
+    public override List<SkillData> Process(SkillData inputData) {
         SkillData modifiedData = inputData.Clone();
         modifiedData.Element = "Fire";
         modifiedData.Name += " C";
