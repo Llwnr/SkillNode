@@ -11,8 +11,10 @@ public class SkillData {
 
     [SerializeField]
     private StringFloatDictionary stats =  new StringFloatDictionary();
-    [SerializeField]
-    private StringListStringDictionary listStats =  new StringListStringDictionary();
+
+    [SerializeField] private StringBoolDictionary statusEffects = new StringBoolDictionary();
+    public StringBoolDictionary StatusEffects => statusEffects;
+    
 
     public void SetStats(string key, float value) {
         if (stats.ContainsKey(key)) {
@@ -35,8 +37,8 @@ public class SkillData {
             Power = this.Power,
             Element = this.Element,
             Cost = this.Cost,
-            stats = stats,
-            listStats = listStats
+            stats = new StringFloatDictionary(this.stats),
+            statusEffects = new StringBoolDictionary(this.statusEffects),
         };
     }
 

@@ -213,7 +213,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   skillInventory:
   - {fileID: 11400000, guid: 5de2205ced8569d41ad5ae71645fd4e6, type: 2}
-  - {fileID: 11400000, guid: 5de2205ced8569d41ad5ae71645fd4e6, type: 2}
+  - {fileID: 11400000, guid: 6d2020ebc5d888c40b8d0ca3e88bb72f, type: 2}
   - {fileID: 11400000, guid: 5de2205ced8569d41ad5ae71645fd4e6, type: 2}
   modifierInventory:
   - {fileID: 11400000, guid: bc097575284e18c4688a8b39fed2fcb5, type: 2}

@@ -3,16 +3,52 @@
 FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CharacterSystem\Character.cs
 ================================================================================
 
+using System;
 using UnityEngine;
 
-public class Character : MonoBehaviour {
+public abstract class Character : MonoBehaviour {
     [SerializeField]private float healthPoints;
     public float HealthPoints => healthPoints;
+    public Action<float> OnDamageReceived;
+    
+    public StringBoolDictionary statusEffects = new StringBoolDictionary();
     
     public void ReceiveDamage(float damage) {
         healthPoints -= damage;
+        OnDamageReceived?.Invoke(healthPoints);
     }
 
+    public void ApplyEffect(string key) {
+        statusEffects[key] = true;
+    }
+
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CharacterSystem\EnemyCharacter.cs
+================================================================================
+
+using System;
+using System.Threading.Tasks;
+
+public class EnemyCharacter : Character {
+    public int waitDelay;
+    private async void Update() {
+        if (TurnManager.Instance.CurrActiveCharacter == this) {
+            await Task.Delay(waitDelay);
+            TurnManager.Instance.EndTurn(this);
+        }
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CharacterSystem\PlayerCharacter.cs
+================================================================================
+
+using UnityEngine;
+
+public class PlayerCharacter : Character {
+    
 }
 
 ================================================================================
@@ -26,6 +62,195 @@ public class FramerateManager : MonoBehaviour {
     public int frameRate = 30;
     private void Start() {
         Application.targetFrameRate = frameRate;
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\GridSystem\GridObject.cs
+================================================================================
+
+public class GridObject {
+    public Character CharacterOnTile;
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\GridSystem\GridSystem.cs
+================================================================================
+
+using UnityEngine;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+
+public class GridSystem<TGridObject>{
+    private int _width, _height;
+    private float _cellSize;
+    private Vector3 _originPos;
+
+    private TGridObject[,] _gridArray;
+    private int TotalWidth => _gridArray.GetLength(0);
+    private int TotalHeight => _gridArray.GetLength(1);
+
+    public GridSystem(int width, int height, float cellSize, Vector3 originPos, Func<TGridObject> createGridObject) {
+        _width = width;
+        _height = height;
+        _cellSize = cellSize;
+        _originPos = originPos;
+
+        _gridArray = new TGridObject[width, height];
+
+        for (int x = 0; x < TotalWidth; x++) {
+            for (int y = 0; y < TotalHeight; y++) {
+                _gridArray[x, y] = createGridObject();
+                Debug.DrawLine(GetWorldPosition(x,y), GetWorldPosition(x,y+1), Color.white, 100f);
+                Debug.DrawLine(GetWorldPosition(x,y), GetWorldPosition(x+1,y), Color.white, 100f);
+            }
+        }
+        Debug.DrawLine(GetWorldPosition(0,height), GetWorldPosition(width,height), Color.white, 100f);
+        Debug.DrawLine(GetWorldPosition(width,height), GetWorldPosition(width,0), Color.white, 100f);
+    }
+
+    public Vector3 GetWorldPosition(int x, int y) {
+        return new Vector3(x, y) * _cellSize + _originPos;
+    }
+
+    public void GetGridPosition(Vector3 worldPos, out int x, out int y) {
+        Vector3 relativePos = worldPos - _originPos;
+        x = Mathf.FloorToInt(relativePos.x / _cellSize);
+        y = Mathf.FloorToInt(relativePos.y / _cellSize);
+    }
+
+    bool IsInGridRange(int x, int y) {
+        return x >= 0 && x < _width && y >= 0 && y < _height;
+    }
+
+    public void SetValue(int x, int y, TGridObject value) {
+        if (!IsInGridRange(x,y)) return;
+        _gridArray[x, y] = value;
+    }
+
+    public void SetValue(Vector3 worldPosition, TGridObject value) {
+        int x, y;
+        GetGridPosition(worldPosition, out x, out y);
+        
+        SetValue(x, y, value);
+    }
+    
+    public TGridObject GetValue(int x, int y) {
+        if (!IsInGridRange(x, y)) return default;
+        return _gridArray[x, y];
+    }
+
+    public TGridObject GetValue(Vector3 worldPos) {
+        int x, y;
+        GetGridPosition(worldPos, out x, out y);
+
+        return GetValue(x,y);
+    }
+
+    public List<Vector2Int> GetRange(Vector3 worldPos, int range) {
+        int x, y;
+        GetGridPosition(worldPos, out x, out y);
+        Vector2Int gridStartPos = new Vector2Int(x, y);
+        return GetRange(gridStartPos, range);
+    }
+
+    public List<Vector2Int> GetRange(Vector2Int startPos, int range) {
+        List<Vector2Int> inRangeCells = new List<Vector2Int>();
+        Queue<PathNode>  queue = new Queue<PathNode>();
+        HashSet<Vector2Int> visitedCells = new HashSet<Vector2Int>();
+        
+        queue.Enqueue(new PathNode(startPos.x, startPos.y, 0));
+        visitedCells.Add(startPos);
+
+        while (queue.Count > 0) {
+            PathNode currentCell = queue.Dequeue();
+
+            if (currentCell.Distance <= range) {
+                inRangeCells.Add(currentCell.GetCoordinates());
+
+                List<Vector2Int> neighbours = GetNeighbours(currentCell.X, currentCell.Y);
+                foreach (var neighbour in neighbours) {
+                    if (visitedCells.Contains(neighbour)) continue;
+                    queue.Enqueue(new PathNode(neighbour.x, neighbour.y, currentCell.Distance + 1));
+                    visitedCells.Add(neighbour);
+                }
+            }
+
+        }
+        return inRangeCells;
+    }
+
+    public List<Vector2Int> GetNeighbours(int x, int y) {
+        List<Vector2Int> validNeighbours = new List<Vector2Int>();
+
+        int[] dx = {-1, 1, 0, 0};
+        int[] dy = {0, 0, 1, -1};
+
+        for (int i = 0; i < dx.Length; i++) {
+            int newX = x + dx[i];
+            int newY = y + dy[i];
+            if (IsInGridRange(newX, newY)) {
+                validNeighbours.Add(new Vector2Int(newX, newY));
+            }
+        }
+
+        return validNeighbours;
+    }
+}
+
+public struct PathNode {
+    public int X,Y;
+    public int Distance;
+
+    public Vector2Int GetCoordinates() {
+        return new Vector2Int(X, Y);
+    }
+
+    public PathNode(int x, int y, int distance) {
+        X = x;
+        Y = y;
+        Distance = distance;
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\GridSystem\GridTester.cs
+================================================================================
+
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using Random = UnityEngine.Random;
+
+public class GridTester : MonoBehaviour {
+    [SerializeField] private int width, height;
+    [SerializeField] private float cellSize;
+    [SerializeField] private Vector3 originPos;
+
+    [SerializeField] private int range;
+    [SerializeField] private Transform square;
+    
+    private GridSystem<int> _grid;
+    private void Start() {
+        _grid = new GridSystem<int>(width, height, cellSize, originPos, () => 0);
+    }
+
+    void DisplayRangeVisual() {
+        Vector3 worldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        
+        List<Vector2Int> ranges = _grid.GetRange(worldPos, range);
+        foreach (var validRange in ranges) {
+            Vector3 pos = _grid.GetWorldPosition(validRange.x, validRange.y);
+            Transform rangeBlock = Instantiate(square, pos + Vector3.one * cellSize * 0.5f, Quaternion.identity);
+            rangeBlock.localScale *= cellSize;
+        }
+    }
+
+    private void Update() {
+        if (Input.GetMouseButtonDown(0)) {
+            DisplayRangeVisual();
+        }
     }
 }
 
@@ -277,7 +502,23 @@ public class FireballNode : SkillNode{
 }
 
 ================================================================================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\ActionSkill.cs
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\NodeSystem\Skills\Implementations\RuptureNode.cs
+================================================================================
+
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "Rupture", menuName = "SkillNode/Rupture")]
+public class RuptureNode : SkillNode{
+    public override void Execute(SkillExecutionContext context, SkillData skillData) {
+        context.Target.ReceiveDamage(skillData.Power);
+        foreach (var kv in skillData.StatusEffects) {
+            context.Target.ApplyEffect(kv.Key);
+        }
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Core\ActionSkill.cs
 ================================================================================
 
 using System;
@@ -296,15 +537,33 @@ public class ActionSkill : IExecutable{
 
     //You would include logic here, such as if enemy has vulnerable then increase the skill's power by 50%.
     public void Execute(SkillExecutionContext context) {
+        ExecutionLogicManager executionLogic = new ExecutionLogicManager(context);
         foreach (var skillData in skillDatas) {
-            _skillNode.Execute(context, skillData);
+            SkillData finalizedData =  executionLogic.ProcessBeforeExecution(skillData);
+            _skillNode.Execute(context, finalizedData);
         }
+    }
+}
+
+public class ExecutionLogicManager {
+    private SkillExecutionContext _context;
+
+    public ExecutionLogicManager(SkillExecutionContext context) {
+        _context = context;
+    }
+
+    public SkillData ProcessBeforeExecution(SkillData data) {
+        SkillData modifiedData = data.Clone();
+        if (_context.Target.statusEffects.ContainsKey("Rupture") && _context.Target.statusEffects["Rupture"]) {
+            modifiedData.Power *= 1.5f;
+        }
+        return modifiedData;
     }
 }
 
 
 ================================================================================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\IExecutable.cs
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Core\IExecutable.cs
 ================================================================================
 
 
@@ -313,7 +572,7 @@ public interface IExecutable {
 }
 
 ================================================================================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\SkillData.cs
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Data\SkillData.cs
 ================================================================================
 
 using System;
@@ -329,8 +588,10 @@ public class SkillData {
 
     [SerializeField]
     private StringFloatDictionary stats =  new StringFloatDictionary();
-    [SerializeField]
-    private StringListStringDictionary listStats =  new StringListStringDictionary();
+
+    [SerializeField] private StringBoolDictionary statusEffects = new StringBoolDictionary();
+    public StringBoolDictionary StatusEffects => statusEffects;
+    
 
     public void SetStats(string key, float value) {
         if (stats.ContainsKey(key)) {
@@ -353,8 +614,8 @@ public class SkillData {
             Power = this.Power,
             Element = this.Element,
             Cost = this.Cost,
-            stats = stats,
-            listStats = listStats
+            stats = new StringFloatDictionary(this.stats),
+            statusEffects = new StringBoolDictionary(this.statusEffects),
         };
     }
 
@@ -364,7 +625,34 @@ public class SkillData {
 }
 
 ================================================================================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\SkillExecutionContext.cs
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Data\SkillInventory.cs
+================================================================================
+
+using System.Collections.Generic;
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "SkillInventory", menuName = "SkillInventory", order = 0)]
+public class SkillInventory : ScriptableObject {
+    public List<ActionSkill> mySkills = new  List<ActionSkill>();
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Data\StatKeys.cs
+================================================================================
+
+public static class StatKeys {
+    public const string HealthCost = "HealthCost";
+    public const string CastDelay = "CastDelay";
+    public const string CritChance = "CritChance";
+    public const string RNG_Seed = "RNG_Seed";
+    
+    // Element Specific
+    public const string BurnDuration = "BurnDuration";
+    public const string FreezeAmount = "FreezeAmount";
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Execution\SkillExecutionContext.cs
 ================================================================================
 
 public class SkillExecutionContext {
@@ -378,7 +666,111 @@ public class SkillExecutionContext {
 }
 
 ================================================================================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\SkillInstance.cs
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Execution\SkillExecutor.cs
+================================================================================
+
+using UnityEngine;
+using UnityEngine.UI;
+
+/// <summary>
+/// This component should be placed on the same GameObject as a SkillInstance.
+/// It handles the process of targeting and executing the associated skill.
+/// </summary>
+[RequireComponent(typeof(SkillInstance))]
+public class SkillExecutor : MonoBehaviour {
+
+    // You must assign the character who is casting this skill in the Inspector.
+    [Tooltip("The character casting the skill.")]
+    [SerializeField] private Character caster;
+
+    private ActionSkill _skillToExecute;
+    private bool _isTargeting = false;
+
+    private void Awake() {
+        // Subscribe to the OnSkillSet event to get the ActionSkill when it's initialized.
+        var skillInstance = GetComponent<SkillInstance>();
+        if (skillInstance != null) {
+            skillInstance.OnSkillSet += (skill) => {
+                _skillToExecute = skill;
+            };
+        }
+    }
+
+    public void Init(Character myCaster) {
+        caster = myCaster;
+    }
+
+    private void Update() {
+        // If we are in targeting mode, wait for the user to click on a target.
+        if (_isTargeting) {
+            // Left-click to select a target and execute the skill.
+            if (Input.GetMouseButtonDown(0)) {
+                if (TurnManager.Instance.CurrActiveCharacter && TurnManager.Instance.CurrActiveCharacter != caster) {
+                    Debug.LogError("Not your turn");
+                    return;
+                }
+                TryExecuteOnTarget();
+            }
+
+            // Right-click to cancel targeting mode.
+            if (Input.GetMouseButtonDown(1)) {
+                Debug.Log("Targeting cancelled.");
+                _isTargeting = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// This public method begins the targeting process. It should be called from a UI element, like a button.
+    /// </summary>
+    public void BeginTargeting() {
+        if (_skillToExecute == null) {
+            Debug.LogError("No skill is available to be executed!");
+            return;
+        }
+        if (caster == null) {
+            Debug.LogError("Caster has not been assigned in the Inspector!");
+            return;
+        }
+
+        Debug.Log($"Targeting started for skill: '{_skillToExecute.SkillNode.name}'. Left-click a target, or Right-click to cancel.");
+        _isTargeting = true;
+    }
+
+    /// <summary>
+    /// Performs a raycast from the mouse position to find and attack a target.
+    /// </summary>
+    private void TryExecuteOnTarget() {
+        // Use a Raycast to detect a 2D object with a collider under the mouse cursor.
+        RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
+
+        if (hit.collider != null) {
+            // Check if the hit object has a Character component.
+            Character target = hit.collider.GetComponent<Character>();
+
+            if (target != null) {
+                Debug.Log($"Target found: {target.name}. Executing skill.");
+
+                // Create the context for the skill with the caster and the selected target.
+                SkillExecutionContext context = new SkillExecutionContext(caster, target);
+
+                // Execute the skill.
+                _skillToExecute.Execute(context);
+
+                // Exit targeting mode after successful execution.
+                _isTargeting = false;
+                TurnManager.Instance.EndTurn(caster);
+            } else {
+                Debug.Log("Clicked on an object that is not a valid Character. Continue targeting.");
+            }
+        } else {
+             Debug.Log("Clicked on empty space. Continue targeting.");
+        }
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Execution\SkillInstance.cs
 ================================================================================
 
 using System;
@@ -395,7 +787,7 @@ public class SkillInstance : MonoBehaviour {
 }
 
 ================================================================================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\SkillInstantiator.cs
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Execution\SkillInstantiator.cs
 ================================================================================
 
 using UnityEngine;
@@ -404,39 +796,126 @@ public class SkillInstantiator : MonoBehaviour {
     [SerializeField]private SkillInventory userSkillInventory;
     [SerializeField]private SkillInstance skillInstancePrefab;
     [SerializeField] private Transform container;
+    [SerializeField] private Character caster;
     private void Start() {
         foreach (var actionSkill in userSkillInventory.mySkills) {
             SkillInstance skillInstance = Instantiate(skillInstancePrefab, container);
             skillInstance.Init(actionSkill);
+            skillInstance.GetComponent<SkillExecutor>().Init(caster);
         }
     }
 }
 
 ================================================================================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\SkillInventory.cs
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\TurnSystem\TurnManager.cs
 ================================================================================
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "SkillInventory", menuName = "SkillInventory", order = 0)]
-public class SkillInventory : ScriptableObject {
-    public List<ActionSkill> mySkills = new  List<ActionSkill>();
+public class TurnManager : MonoBehaviour {
+    [SerializeField] private Character player;
+    [SerializeField] private Character enemy;
+
+    [SerializeField]private Character _currActiveCharacter = null;
+
+    public Character CurrActiveCharacter => _currActiveCharacter;
+
+    public int roundNum = 0;
+    
+    private static TurnManager _instance;
+    public static TurnManager Instance => _instance;
+
+    private void Awake() {
+        if (_instance != null) {
+            throw new Exception("TurnManager already exists");
+        }
+
+        _instance = this;
+    }
+
+    private void Start() {
+        BeginPlayerTurn();
+    }
+
+    void BeginPlayerTurn() {
+        _currActiveCharacter = player;
+    }
+
+    public void EndTurn(Character caster) {
+        if (caster != _currActiveCharacter) return;
+        if (caster == player) {
+            _currActiveCharacter = enemy;
+        }
+        else {
+            roundNum++;
+            _currActiveCharacter = player;
+        }
+    }
 }
 
 ================================================================================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\StatKeys.cs
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\HealthBar.cs
 ================================================================================
 
-public static class StatKeys {
-    public const string HealthCost = "HealthCost";
-    public const string CastDelay = "CastDelay";
-    public const string CritChance = "CritChance";
-    public const string RNG_Seed = "RNG_Seed";
+using System;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class HealthBar : MonoBehaviour {
+    [SerializeField] private Character target;
+    public Image hpBar;
+    private float _currHp, _maxHp;
     
-    // Element Specific
-    public const string BurnDuration = "BurnDuration";
-    public const string FreezeAmount = "FreezeAmount";
+    private void Start() {
+        target.OnDamageReceived += UpdateHealthBar;
+        _currHp = target.HealthPoints;
+        _maxHp = target.HealthPoints;
+        UpdateHealthBar(_currHp);
+    }
+
+    void UpdateHealthBar(float currHealth) {
+        hpBar.fillAmount = currHealth / _maxHp;
+    }
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\Popup.cs
+================================================================================
+
+using UnityEngine;
+
+public class Popup : MonoBehaviour {
+    
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\UIFollowWorldspace.cs
+================================================================================
+
+using System;
+using UnityEngine;
+
+public class UIFollowWorldspace : MonoBehaviour {
+    [SerializeField] private GameObject worldspaceTarget;
+    [SerializeField] private Vector2 offset;
+
+    private void Start() {
+        FollowTarget();
+    }
+
+    private void FixedUpdate() {
+        FollowTarget();
+    }
+
+    void FollowTarget() {
+        if (worldspaceTarget != null) {
+            transform.position = Camera.main.WorldToScreenPoint(worldspaceTarget.transform.position + (Vector3)offset);
+        }
+    }
 }
 
 ================================================================================
@@ -651,6 +1130,35 @@ public class SkillNodeUI : MonoBehaviour{
     }
     
     
+}
+
+================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\Utilities\Movement.cs
+================================================================================
+
+using System;
+using UnityEngine;
+
+[RequireComponent(typeof(Rigidbody2D))]
+public class Movement : MonoBehaviour {
+    private Rigidbody2D _rb;
+    [SerializeField] private float moveSpeed;
+
+    private void Start() {
+        _rb = GetComponent<Rigidbody2D>();
+    }
+
+    private void FixedUpdate() {
+        ApplyDrag();
+        
+        float hDir = Input.GetAxis("Horizontal");
+        float vDir = Input.GetAxis("Vertical");
+        _rb.AddForce(new Vector2(hDir * moveSpeed, vDir * moveSpeed));
+    }
+
+    void ApplyDrag() {
+        _rb.velocity *= 0.8f;
+    }
 }
 
 ================================================================================
@@ -1124,10 +1632,16 @@ using System;
 using System.Collections.Generic;
 
 [Serializable]
-public class StringFloatDictionary : SerializableDictionary<string, float>{}
+public class StringFloatDictionary : SerializableDictionary<string, float> {
+    public StringFloatDictionary() : base() { }
+    public StringFloatDictionary(IDictionary<string, float> dict): base(dict) { }
+}
 
 [Serializable]
-public class StringListStringDictionary : SerializableDictionary<string, List<string>> {}
+public class StringBoolDictionary : SerializableDictionary<string, bool> {
+    public StringBoolDictionary() : base() { }
+    public StringBoolDictionary(IDictionary<string, bool> dict) : base(dict) { }
+}
 
 ================================================================================
 FILE: C:\Asesh\Unity\SkillNode\Assets\SerializableDictionary\Editor\SerializableDictionaryPropertyDrawer.cs

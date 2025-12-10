@@ -15,5 +15,5 @@ MonoBehaviour:
   name: Splitter
   cost: 1
   numOfSplits: 2
-  powerMult: 0.6
+  powerMult: 1
   costMult: 0.5
