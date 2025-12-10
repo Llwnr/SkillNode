@@ -66,11 +66,64 @@ public class FramerateManager : MonoBehaviour {
 }
 
 ================================================================================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\GridSystem\GridMovement.cs
+================================================================================
+
+//namespace DefaultNamespace
+//{
+
+using System.Collections.Generic;
+using UnityEngine;
+
+public class GridMovement {
+    private GridSystem<GridObject> _gridSystem;
+
+    public GridMovement(GridSystem<GridObject> gridSystem) {
+        _gridSystem = gridSystem;
+    }
+
+    public void MoveBy(Character character, int x, int y) {
+        Vector3 charPos = character.transform.position;
+        
+        _gridSystem.GetGridPosition(charPos, out int posX, out int posY);
+        Vector3 newPos = _gridSystem.GetWorldPosition(posX+x, posY+y);
+        
+        character.transform.position = newPos;
+    }
+
+    public void MoveTo(Character character, Vector3 targetPos) {
+        _gridSystem.GetGridPosition(character.transform.position, out int posX, out int posY);
+        List<Vector2Int> cellsInRadius = _gridSystem.GetRadiusInGrid(new Vector2Int(posX, posY), 3);
+        float dist = 9999;
+        Vector2Int closestAxes = new Vector2Int(0,0);
+        
+        _gridSystem.GetGridPosition(targetPos, out int targetX, out int targetY);
+        Vector3 targetPosFixed = _gridSystem.GetWorldPosition(targetX, targetY);
+        foreach (var cellAxes in cellsInRadius) {
+            if (Vector2.Distance(_gridSystem.GetWorldPosition(cellAxes.x, cellAxes.y), targetPosFixed) <= dist) {
+                dist = Vector2.Distance(_gridSystem.GetWorldPosition(cellAxes.x, cellAxes.y), targetPosFixed);
+                closestAxes = cellAxes;
+            }
+        }
+        
+        character.transform.position = _gridSystem.GetWorldPosition(closestAxes.x, closestAxes.y) + Vector3.one*1.5f;
+    }
+}
+
+================================================================================
 FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\GridSystem\GridObject.cs
 ================================================================================
 
 public class GridObject {
     public Character CharacterOnTile;
+    
+    public void SetCharacter(Character character) {
+        CharacterOnTile = character;
+    }
+
+    public void RemoveCharacter() {
+        CharacterOnTile = null;
+    }
 }
 
 ================================================================================
@@ -148,14 +201,14 @@ public class GridSystem<TGridObject>{
         return GetValue(x,y);
     }
 
-    public List<Vector2Int> GetRange(Vector3 worldPos, int range) {
+    public List<Vector2Int> GetRadiusInGrid(Vector3 worldPos, int range) {
         int x, y;
         GetGridPosition(worldPos, out x, out y);
         Vector2Int gridStartPos = new Vector2Int(x, y);
-        return GetRange(gridStartPos, range);
+        return GetRadiusInGrid(gridStartPos, range);
     }
 
-    public List<Vector2Int> GetRange(Vector2Int startPos, int range) {
+    public List<Vector2Int> GetRadiusInGrid(Vector2Int startPos, int range) {
         List<Vector2Int> inRangeCells = new List<Vector2Int>();
         Queue<PathNode>  queue = new Queue<PathNode>();
         HashSet<Vector2Int> visitedCells = new HashSet<Vector2Int>();
@@ -231,15 +284,18 @@ public class GridTester : MonoBehaviour {
     [SerializeField] private int range;
     [SerializeField] private Transform square;
     
-    private GridSystem<int> _grid;
+    private GridSystem<GridObject> _grid;
+    [SerializeField] private PlayerCharacter _character;
+    private GridMovement _gridMovement;
     private void Start() {
-        _grid = new GridSystem<int>(width, height, cellSize, originPos, () => 0);
+        _grid = new GridSystem<GridObject>(width, height, cellSize, originPos, () => new GridObject());
+        _gridMovement = new GridMovement(_grid);
     }
 
     void DisplayRangeVisual() {
-        Vector3 worldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Vector3 worldPos = _character.transform.position;
         
-        List<Vector2Int> ranges = _grid.GetRange(worldPos, range);
+        List<Vector2Int> ranges = _grid.GetRadiusInGrid(worldPos, range);
         foreach (var validRange in ranges) {
             Vector3 pos = _grid.GetWorldPosition(validRange.x, validRange.y);
             Transform rangeBlock = Instantiate(square, pos + Vector3.one * cellSize * 0.5f, Quaternion.identity);
@@ -250,6 +306,7 @@ public class GridTester : MonoBehaviour {
     private void Update() {
         if (Input.GetMouseButtonDown(0)) {
             DisplayRangeVisual();
+            _gridMovement.MoveTo(_character, Camera.main.ScreenToWorldPoint(Input.mousePosition));
         }
     }
 }

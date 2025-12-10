@@ -9,12 +9,25 @@ public class SkillData {
     public string Element;
     public float Cost;
 
+    public int Range;
+
     [SerializeField]
     private StringFloatDictionary stats =  new StringFloatDictionary();
 
     [SerializeField] private StringBoolDictionary statusEffects = new StringBoolDictionary();
     public StringBoolDictionary StatusEffects => statusEffects;
     
+    public SkillData Clone() {
+        return new SkillData{
+            Name = this.Name,
+            Power = this.Power,
+            Element = this.Element,
+            Cost = this.Cost,
+            Range = this.Range,
+            stats = new StringFloatDictionary(this.stats),
+            statusEffects = new StringBoolDictionary(this.statusEffects),
+        };
+    }
 
     public void SetStats(string key, float value) {
         if (stats.ContainsKey(key)) {
@@ -29,17 +42,6 @@ public class SkillData {
             return value;
         }
         return 0;
-    }
-
-    public SkillData Clone() {
-        return new SkillData{
-            Name = this.Name,
-            Power = this.Power,
-            Element = this.Element,
-            Cost = this.Cost,
-            stats = new StringFloatDictionary(this.stats),
-            statusEffects = new StringBoolDictionary(this.statusEffects),
-        };
     }
 
     public override string ToString() {

@@ -78,6 +78,7 @@ public class SkillExecutor : MonoBehaviour {
             Character target = hit.collider.GetComponent<Character>();
 
             if (target != null) {
+                if (!CanReach(target)) return;
                 Debug.Log($"Target found: {target.name}. Executing skill.");
 
                 // Create the context for the skill with the caster and the selected target.
@@ -95,5 +96,20 @@ public class SkillExecutor : MonoBehaviour {
         } else {
              Debug.Log("Clicked on empty space. Continue targeting.");
         }
+    }
+
+    private bool CanReach(Character target) {
+        GridSystem<GridObject> grid = GridManager.Instance.Grid;
+        GridMovement gridMovement = new GridMovement(grid);
+                
+        Vector2Int targetPosInGrid = grid.GetGridPosition(target.transform.position);
+        Vector2Int casterPosInGrid = grid.GetGridPosition(caster.transform.position);
+        if (!gridMovement.IsInRange(casterPosInGrid, targetPosInGrid,
+                _skillToExecute.SkillNode.BaseData.Range)) {
+            Debug.LogWarning("Skill is not in range of target");
+            return false;
+        }
+
+        return true;
     }
 }

@@ -3,6 +3,7 @@ using UnityEngine;
 
 public abstract class Character : MonoBehaviour {
     [SerializeField]private float healthPoints;
+    public int moveRange = 3;
     public float HealthPoints => healthPoints;
     public Action<float> OnDamageReceived;
     

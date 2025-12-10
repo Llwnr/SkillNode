@@ -18,6 +18,7 @@ MonoBehaviour:
     Power: 0
     Element: 
     Cost: 0
+    Range: 3
     stats:
       m_keys: []
       m_values: []
