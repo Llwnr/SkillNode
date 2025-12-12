@@ -2,7 +2,7 @@
 
 public class SkillNodeDropZone : DropZone{
     public override bool Condition(PointerEventData eventData) {
-        return (eventData.pointerDrag != null && eventData.pointerDrag.GetComponent<SkillNodeUI>() != null);
+        return (eventData.pointerDrag != null && eventData.pointerDrag.GetComponent<SkillNodeInstance>() != null);
     }
 
     public override void Action(PointerEventData eventData) {

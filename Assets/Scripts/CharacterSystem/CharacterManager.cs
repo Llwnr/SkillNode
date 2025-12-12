@@ -8,8 +8,7 @@ public class CharacterManager : MonoBehaviour {
     }
 
     void SetupCharactersInGrid() {
-        GridSystem<GridObject> grid = GridManager.Instance.Grid;
-        grid.GetGridObject(player.transform.position).SetCharacter(player);
-        grid.GetGridObject(enemy.transform.position).SetCharacter(enemy);
+        GridManager.Instance.SnapToGrid(player);
+        GridManager.Instance.SnapToGrid(enemy);
     }
 }

@@ -12,7 +12,6 @@ public class SkillNodeInstance : MonoBehaviour {
     private List<ModifierDropZone> modifierSlots = new List<ModifierDropZone>();
 
     [SerializeField] private ModifierDropZone modDropZonePrefab;
-
     [SerializeField] private Transform dropZoneContainer;
     //UI STUFF
     [SerializeField] private SkillNodeUI skillNodeUI;
@@ -21,13 +20,14 @@ public class SkillNodeInstance : MonoBehaviour {
         coreSkillNode = skillNode;
         for (int i = 0; i < numOfModSlots; i++) {
             ModifierDropZone dropZone = Instantiate(modDropZonePrefab, dropZoneContainer);
+            dropZone.gameObject.SetActive(false);
             modifierSlots.Add(dropZone);
         }
-        
-        skillNodeUI.UpdateVisuals();
+
+        CompileAndReturnSkill();
     }
 
-    public List<ModifierNode> GetLinearModifierList() {
+    public List<ModifierNode> GetModifiers() {
         List<ModifierNode> foundModifiers = new List<ModifierNode>();
 
         foreach (var slot in modifierSlots) {
@@ -38,5 +38,30 @@ public class SkillNodeInstance : MonoBehaviour {
         }
 
         return foundModifiers;
+    }
+
+    public void ToggleModSockets(bool value) {
+        foreach (var modSlot in modifierSlots) {
+            modSlot.gameObject.SetActive(value);
+        }
+    }
+    
+    public ActionSkill CompileAndReturnSkill() {
+        List<SkillData> currentBatch = new List<SkillData>();
+        currentBatch.Add(coreSkillNode.BaseData.Clone());
+
+        foreach (var mod in GetModifiers()) {
+            List<SkillData> nextBatch = new List<SkillData>();
+
+            foreach (var data in currentBatch) {
+                nextBatch.AddRange(mod.Process(data));
+            }
+
+            currentBatch = nextBatch;
+        }
+
+        ActionSkill compiledSkill = new ActionSkill(coreSkillNode, currentBatch);
+        skillNodeUI?.UpdateVisuals(compiledSkill);
+        return compiledSkill;
     }
 }

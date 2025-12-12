@@ -8,6 +8,8 @@ public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDra
     private Vector3 _startPosition;
     private Transform _startParent;
 
+    private DropZone _droppedZone;
+
     public Action OnDragStart;
 
     public void SetStartParent(Transform startParent) {
@@ -30,6 +32,7 @@ public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDra
         transform.SetParent(transform.root);
 
         OnDragStart?.Invoke();
+        _droppedZone?.OnPickup(eventData);
     }
 
     public void OnDrag(PointerEventData eventData){
@@ -39,9 +42,17 @@ public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDra
     public void OnEndDrag(PointerEventData eventData){
         _canvasGroup.alpha = 1f;
         _canvasGroup.blocksRaycasts = true;
-        if (transform.parent == transform.root){
-            transform.position = _startPosition;
-            transform.SetParent(_startParent);
+        if (transform.parent == transform.root) {
+            Reset(eventData);
         }
+        else {
+            transform.parent.TryGetComponent(out _droppedZone);
+        }
+    }
+
+    private void Reset(PointerEventData eventData) {
+        transform.position = _startPosition;
+        transform.SetParent(_startParent);
+        _droppedZone?.OnDrop(eventData);
     }
 }

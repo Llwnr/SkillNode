@@ -415,7 +415,7 @@ GameObject:
   - component: {fileID: 8699977033541559076}
   - component: {fileID: 3986726270146741664}
   m_Layer: 5
-  m_Name: UI_SkillDataInfo
+  m_Name: UI_SkillInfo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

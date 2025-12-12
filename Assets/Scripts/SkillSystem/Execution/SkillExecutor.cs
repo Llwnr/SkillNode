@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿
+using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
@@ -34,6 +35,7 @@ public class SkillExecutor : MonoBehaviour {
         if (_isTargeting) {
             // Left-click to select a target and execute the skill.
             if (Input.GetMouseButtonDown(0)) {
+                UI_SkillAreaDisplay.Instance.TilesDisplayable = false;
                 if (TurnManager.Instance.CurrActiveCharacter && TurnManager.Instance.CurrActiveCharacter != caster) {
                     Debug.LogError("Not your turn");
                     return;
@@ -45,12 +47,13 @@ public class SkillExecutor : MonoBehaviour {
             if (Input.GetMouseButtonDown(1)) {
                 Debug.Log("Targeting cancelled.");
                 _isTargeting = false;
+                UI_SkillAreaDisplay.Instance.TilesDisplayable = false;
             }
         }
     }
 
     /// <summary>
-    /// This public method begins the targeting process. It should be called from a UI element, like a button.
+    /// This public method begins the targeting process. It is called from a UI element, like a button.
     /// </summary>
     public void BeginTargeting() {
         if (_skillToExecute == null) {
@@ -64,6 +67,9 @@ public class SkillExecutor : MonoBehaviour {
 
         Debug.Log($"Targeting started for skill: '{_skillToExecute.SkillNode.name}'. Left-click a target, or Right-click to cancel.");
         _isTargeting = true;
+        //UI Stuff
+        UI_SkillAreaDisplay.Instance.TilesDisplayable = true;
+        UI_SkillAreaDisplay.Instance.RangeCache = _skillToExecute.SkillNode.BaseData.Range;
     }
 
     /// <summary>
@@ -99,13 +105,17 @@ public class SkillExecutor : MonoBehaviour {
     }
 
     private bool CanReach(Character target) {
-        GridSystem<GridObject> grid = GridManager.Instance.Grid;
-        GridMovement gridMovement = new GridMovement(grid);
+        GridManager gridManager = GridManager.Instance;
+        GridSystem<GridObject> grid = gridManager.Grid;
                 
         Vector2Int targetPosInGrid = grid.GetGridPosition(target.transform.position);
         Vector2Int casterPosInGrid = grid.GetGridPosition(caster.transform.position);
-        if (!gridMovement.IsInRange(casterPosInGrid, targetPosInGrid,
-                _skillToExecute.SkillNode.BaseData.Range)) {
+        //If caster clicked itself, then obviously they can reach, so return true
+        if (targetPosInGrid == casterPosInGrid) {
+            return true;
+        }
+        if (gridManager.IsTileInRange(casterPosInGrid, targetPosInGrid,
+                _skillToExecute.SkillNode.BaseData.Range, true)) {
             Debug.LogWarning("Skill is not in range of target");
             return false;
         }

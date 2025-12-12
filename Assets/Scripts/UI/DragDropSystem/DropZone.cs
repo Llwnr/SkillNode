@@ -13,4 +13,8 @@ public abstract class DropZone : MonoBehaviour, IDropHandler {
             Action(eventData);
         }
     }
+
+    public virtual void OnPickup(PointerEventData eventData) {
+        
+    }
 }
