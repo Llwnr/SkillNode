@@ -38,7 +38,7 @@ public class GridManager : MonoBehaviour {
     #endregion
     
     #region Actions, Movement
-    public void MoveCharacter(Character character, Vector2Int targetCoords) {
+    public void MoveCharacter(UnitInstance character, Vector2Int targetCoords) {
         if (!IsValidGridPosition(targetCoords)) return;
         
         Vector2Int startCoords = GetGridPosition(character.transform.position);
@@ -48,7 +48,7 @@ public class GridManager : MonoBehaviour {
             return;
         }
 
-        if (!IsTileInRange(startCoords, targetCoords, character.moveRange, false)) return;
+        if (!IsTileInRange(startCoords, targetCoords, 3, false)) return;
         
         GridObject startCell = GetGridObject(startCoords);
         GridObject targetCell = GetGridObject(targetCoords);
@@ -70,7 +70,7 @@ public class GridManager : MonoBehaviour {
         // Debug.Log($"{character.name} moved to {nearestCoordToTarget}");
     }
 
-    public void SnapToGrid(Character character) {
+    public void SnapToGrid(UnitInstance character) {
         Vector2Int pos = GetGridPosition(character.transform.position);
         if (IsValidGridPosition(pos)) {
             GetGridObject(pos).SetCharacter(character);
