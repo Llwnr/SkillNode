@@ -8,6 +8,6 @@ public abstract class Trait : ScriptableObject {
     public string description;
 
     //Trait logic goes here. Subscribe to gameplay events to activate trait effects essentially
-    public virtual void RegisterHooks(UnitInstance unit) { }
-    public virtual void DeregisterHooks(UnitInstance unit) { }
+    public abstract void ApplyTo(TraitInstance instance);
+    public virtual void OnRemoval(TraitInstance instance){}
 }

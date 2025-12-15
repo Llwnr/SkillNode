@@ -1,8 +1,15 @@
-﻿public abstract class StatusEffect {
-    public abstract void RegisterHooks(UnitInstance unit);
-    public abstract void DeregisterHooks(UnitInstance unit);
+﻿using UnityEngine;
 
-    public override string ToString() {
-        return $"{GetType().Name}";
-    }
+public abstract class StatusEffect : ScriptableObject {
+    public new string name;
+    [TextArea(3,10)]
+    public string description;
+
+    public bool isDurationBased = true;
+    public float tickInterval = 1.0f;
+    
+    
+    public abstract void ApplyTo(StatusEffectInstance instance);
+    public abstract void OnTick(StatusEffectInstance instance);
+    public virtual void OnRemoval(StatusEffectInstance instance){}
 }

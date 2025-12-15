@@ -1,13 +1,17 @@
-﻿public class BurnEffect : StatusEffect{
-    public override void RegisterHooks(UnitInstance unit) {
-        unit.OnDamageReceived += BurnDmgOnTick;
+﻿using UnityEngine;
+
+[CreateAssetMenu(fileName = "BurnEffect", menuName = "StatusEffects/BurnEffect")]
+public class BurnEffect : StatusEffect{
+    public override void ApplyTo(StatusEffectInstance instance) {
+        
     }
 
-    public override void DeregisterHooks(UnitInstance unit) {
-        unit.OnDamageReceived -= BurnDmgOnTick;
+    public override void OnRemoval(StatusEffectInstance instance) {
+        
     }
 
-    void BurnDmgOnTick(UnitInstance unit, float dmgAmt) {
-        unit.Stats.currentHp -= 5;
+    public override void OnTick(StatusEffectInstance instance) {
+        StatusEffectData data = instance.EffectData;
+        Debug.Log($"{instance.Owner.name} received {data.StackCount*data.Magnitude} damage");
     }
 }
