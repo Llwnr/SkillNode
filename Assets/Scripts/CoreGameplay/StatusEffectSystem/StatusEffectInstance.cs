@@ -6,7 +6,6 @@ public class StatusEffectInstance {
     public StatusEffect StatusEffect { get; private set; }
     public StatusEffectData EffectData { get; private set; }
     public UnitInstance Owner { get; private set; }
-    public Type EffectType => StatusEffect.GetType();
 
     public List<Action> CleanupActions = new List<Action>();
 
@@ -45,7 +44,6 @@ public class StatusEffectInstance {
 
     public void AddStacks(int stackAmt) {
         EffectData.StackCount += stackAmt;
-        Debug.Log("Adding stacks:" + stackAmt + " new amt: " + EffectData.StackCount);
     }
 
     public void Refresh() {

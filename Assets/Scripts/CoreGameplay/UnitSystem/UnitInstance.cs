@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.Serialization;
 
 public class UnitInstance : MonoBehaviour {
+    [SerializeField] private UnitBaseConfig unitConfig;
     private UnitStats _stats; //The runtime changeable and latest stats of the unit.
     public UnitStats Stats => _stats;
     
@@ -13,36 +14,41 @@ public class UnitInstance : MonoBehaviour {
     public List<StatusEffectInstance> _inflictedStatusEffects = new List<StatusEffectInstance>();
 
     public UnitEvents Events { get; private set; } = new UnitEvents();
+    public HealthComponent HealthComponent { get; private set; }
+
+    private void Awake() {
+        _stats = new UnitStats(unitConfig);
+        HealthComponent = GetComponent<HealthComponent>();
+    }
 
     private void Update() {
-        PassUpdateToStatusEffects(Time.deltaTime);
+        UpdateStatusEffectsTimer(Time.deltaTime);
     }
 
     #region Status Effect Management
 
     public void ApplyStatusEffect(StatusEffect effect, StatusEffectData effectData) {
-        StatusEffectInstance existingEffect = _inflictedStatusEffects.FirstOrDefault(eff => eff.EffectType == effect.GetType());
+        StatusEffectInstance existingEffect = _inflictedStatusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
         if (existingEffect != null) {
             existingEffect.AddStacks(effectData.StackCount);
             existingEffect.Refresh();
             return;
         }
 
-        Debug.Log("Didn't found the effect. Adding new one");
         StatusEffectInstance effectInstance = new StatusEffectInstance(effect, this, effectData);
         effectInstance.Apply();
         _inflictedStatusEffects.Add(effectInstance);
     }
 
     public void RemoveStatusEffect(StatusEffect effect) {
-        StatusEffectInstance existingEffect = _inflictedStatusEffects.FirstOrDefault(eff => eff.EffectType == effect.GetType());
+        StatusEffectInstance existingEffect = _inflictedStatusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
         if (existingEffect != null) {
             existingEffect.Remove();
             _inflictedStatusEffects.Remove(existingEffect);
         }
     }
 
-    void PassUpdateToStatusEffects(float deltaTime) {
+    void UpdateStatusEffectsTimer(float deltaTime) {
         for (int i = _inflictedStatusEffects.Count - 1; i >= 0; i--) {
             _inflictedStatusEffects[i].Update(deltaTime);
         }

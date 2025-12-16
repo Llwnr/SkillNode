@@ -4,21 +4,25 @@ using UnityEngine;
 
 [CreateAssetMenu(fileName = "IgniteTrait", menuName = "Traits/IgniteTrait")]
 public class IgniteTrait : Trait {
-    [SerializeField]private BurnEffect burnEffectToApply;
-    [SerializeField]private StatusEffectData runtimeEffectData;
+    [SerializeField]private StatusEffect burnEffectToApply;
+    [SerializeField]private StatusEffectData effectData;
+    
     public override void ApplyTo(TraitInstance instance) {
         UnitInstance owner = instance.Owner;
 
-        UnitEvents.DamageDealtEventHandler inflictBurnOnHit = (attacker, target, damage) => {
-            Debug.Log($"{target.name} has been inflicted with burn");
-            runtimeEffectData.StackCount = instance.TraitData.StackCount; //Strong ignite traits inflict stronger burn stacks
-            target.ApplyStatusEffect(burnEffectToApply, runtimeEffectData);
+        Action<DamagePacket> inflictBurnToTarget = (packet) => {
+            var runtimeEffectData = new StatusEffectData(
+                effectData.Duration,
+                instance.TraitData.StackCount,
+                effectData.Magnitude
+            );
+            packet.Target?.ApplyStatusEffect(burnEffectToApply, runtimeEffectData);
         };
         
-        owner.Events.OnDamageDealt += inflictBurnOnHit;
+        owner.Events.OnDamageDealt += inflictBurnToTarget;
         
         instance.CleanupActions.Add(() => {
-            owner.Events.OnDamageDealt -= inflictBurnOnHit;
+            owner.Events.OnDamageDealt -= inflictBurnToTarget;
         });
     }
 

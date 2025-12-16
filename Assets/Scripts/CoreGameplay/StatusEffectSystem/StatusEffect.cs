@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 
 public abstract class StatusEffect : ScriptableObject {
+    public string effectId;
     public new string name;
     [TextArea(3,10)]
     public string description;
@@ -9,7 +10,7 @@ public abstract class StatusEffect : ScriptableObject {
     public float tickInterval = 1.0f;
     
     
-    public abstract void ApplyTo(StatusEffectInstance instance);
-    public abstract void OnTick(StatusEffectInstance instance);
+    public virtual void ApplyTo(StatusEffectInstance instance){}
+    public virtual void OnTick(StatusEffectInstance instance){}
     public virtual void OnRemoval(StatusEffectInstance instance){}
 }
