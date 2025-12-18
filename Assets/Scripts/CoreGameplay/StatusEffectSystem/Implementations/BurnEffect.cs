@@ -4,7 +4,6 @@
 public class BurnEffect : StatusEffect{
     public override void OnTick(StatusEffectInstance instance) {
         StatusEffectData data = instance.EffectData;
-        Debug.Log($"{instance.Owner.name} received {data.StackCount*data.Magnitude} damage");
         float dmgValue = data.StackCount * data.Magnitude;
         DamagePacket dmgPacket = new DamagePacket(dmgValue, null, instance.Owner);
         dmgPacket.IsIndirect = true;

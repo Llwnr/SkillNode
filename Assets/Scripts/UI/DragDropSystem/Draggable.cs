@@ -2,13 +2,13 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler{
+public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler {
+    public GameObject runtimeObject;
+    
     private RectTransform _rectTransform;
     private CanvasGroup _canvasGroup;
     private Vector3 _startPosition;
     private Transform _startParent;
-
-    private DropZone _droppedZone;
 
     public Action OnDragStart;
 
@@ -27,12 +27,12 @@ public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDra
     public void OnBeginDrag(PointerEventData eventData){
         _startPosition = _rectTransform.position;
         _startParent = transform.parent;
+        
         _canvasGroup.alpha = 0.6f;
         _canvasGroup.blocksRaycasts = false;
         transform.SetParent(transform.root);
 
         OnDragStart?.Invoke();
-        _droppedZone?.OnPickup(eventData);
     }
 
     public void OnDrag(PointerEventData eventData){
@@ -45,14 +45,10 @@ public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDra
         if (transform.parent == transform.root) {
             Reset(eventData);
         }
-        else {
-            transform.parent.TryGetComponent(out _droppedZone);
-        }
     }
 
     private void Reset(PointerEventData eventData) {
         transform.position = _startPosition;
         transform.SetParent(_startParent);
-        _droppedZone?.OnDrop(eventData);
     }
 }

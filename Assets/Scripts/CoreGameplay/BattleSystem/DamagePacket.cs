@@ -1,4 +1,6 @@
-﻿public enum DamageType {
+﻿using System.Collections.Generic;
+
+public enum DamageType {
     Physical,
     Fire,
     Cold,
@@ -12,6 +14,9 @@ public class DamagePacket {
     public bool IsCancelled;
     public bool IsIndirect;
     public DamageType DamageType;
+
+    //Visual stuff
+    public List<string> Popups;
 
     public DamagePacket(float amt, UnitInstance attacker, UnitInstance target) {
         DamageAmount = amt;

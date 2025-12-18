@@ -9,8 +9,8 @@ public class TraitInstance {
     public UnitInstance Owner => _owner;
     private TraitData _traitData;
     public TraitData TraitData => _traitData;
-    
-    public List<Action> CleanupActions = new List<Action>();
+
+    public readonly SubscriptionManager Subscriptions = new SubscriptionManager();
     
     public TraitInstance(Trait trait, UnitInstance owner, TraitData traitData) {
         _trait = trait;
@@ -28,12 +28,7 @@ public class TraitInstance {
         _trait.ApplyTo(this);
     }
 
-    public void Remove() {
-        foreach (var cleanupAction in CleanupActions) {
-            cleanupAction.Invoke();
-        }
-        CleanupActions.Clear();
-        
-        _trait.OnRemoval(this);
+    public void Cleanup() {
+        Subscriptions.Dispose();
     }
 }

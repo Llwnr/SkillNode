@@ -10,8 +10,8 @@ public class UnitInstance : MonoBehaviour {
     private UnitStats _stats; //The runtime changeable and latest stats of the unit.
     public UnitStats Stats => _stats;
     
-    public List<TraitInstance> _ownedTraits = new List<TraitInstance>();
-    public List<StatusEffectInstance> _inflictedStatusEffects = new List<StatusEffectInstance>();
+    public List<TraitInstance> _traits = new List<TraitInstance>();
+    public List<StatusEffectInstance> _statusEffects = new List<StatusEffectInstance>();
 
     public UnitEvents Events { get; private set; } = new UnitEvents();
     public HealthComponent HealthComponent { get; private set; }
@@ -28,7 +28,7 @@ public class UnitInstance : MonoBehaviour {
     #region Status Effect Management
 
     public void ApplyStatusEffect(StatusEffect effect, StatusEffectData effectData) {
-        StatusEffectInstance existingEffect = _inflictedStatusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
+        StatusEffectInstance existingEffect = _statusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
         if (existingEffect != null) {
             existingEffect.AddStacks(effectData.StackCount);
             existingEffect.Refresh();
@@ -37,20 +37,20 @@ public class UnitInstance : MonoBehaviour {
 
         StatusEffectInstance effectInstance = new StatusEffectInstance(effect, this, effectData);
         effectInstance.Apply();
-        _inflictedStatusEffects.Add(effectInstance);
+        _statusEffects.Add(effectInstance);
     }
 
     public void RemoveStatusEffect(StatusEffect effect) {
-        StatusEffectInstance existingEffect = _inflictedStatusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
+        StatusEffectInstance existingEffect = _statusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
         if (existingEffect != null) {
             existingEffect.Remove();
-            _inflictedStatusEffects.Remove(existingEffect);
+            _statusEffects.Remove(existingEffect);
         }
     }
 
     void UpdateStatusEffectsTimer(float deltaTime) {
-        for (int i = _inflictedStatusEffects.Count - 1; i >= 0; i--) {
-            _inflictedStatusEffects[i].Update(deltaTime);
+        for (int i = _statusEffects.Count - 1; i >= 0; i--) {
+            _statusEffects[i].Update(deltaTime);
         }
     }
     #endregion
@@ -58,7 +58,7 @@ public class UnitInstance : MonoBehaviour {
     #region Trait Management
     
     public void ApplyTrait(Trait trait, TraitData traitData) {
-        TraitInstance existingTrait =  _ownedTraits.FirstOrDefault(t => t.TraitType == trait.GetType());
+        TraitInstance existingTrait =  _traits.FirstOrDefault(t => t.TraitType == trait.GetType());
         //Check if trait is unique
         if (existingTrait != null){
             existingTrait.AddStacks(traitData.StackCount);
@@ -67,23 +67,23 @@ public class UnitInstance : MonoBehaviour {
         //If trait is unique and hasn't been added
         TraitInstance traitInstance = new TraitInstance(trait, this, traitData);
         traitInstance.Apply();
-        _ownedTraits.Add(traitInstance);
+        _traits.Add(traitInstance);
     }
 
     public void RemoveTrait(Trait trait) {
-        TraitInstance traitInstance = _ownedTraits.FirstOrDefault(t => t.TraitType == trait.GetType());
+        TraitInstance traitInstance = _traits.FirstOrDefault(t => t.TraitType == trait.GetType());
         if (traitInstance != null) {
-            traitInstance.Remove();
-            _ownedTraits.Remove(traitInstance);
+            traitInstance.Cleanup();
+            _traits.Remove(traitInstance);
         }
     }
 
     //How to handle trait removal when the object is destroyed..?
     void HandleTraitRemoval() {
-        foreach (var traitInstance in _ownedTraits) {
-            traitInstance.Remove();
+        foreach (var traitInstance in _traits) {
+            traitInstance.Cleanup();
         }
-        _ownedTraits.Clear();
+        _traits.Clear();
     }
     #endregion
 

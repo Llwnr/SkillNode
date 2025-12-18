@@ -3,7 +3,8 @@ using UnityEngine;
 
 public class HealthComponent : MonoBehaviour {
     [SerializeField] private UnitInstance _unitSelf;
-    public float _currentHp;
+    private float _currentHp;
+    public float CurrentHp => _currentHp;
     
     private void Start() {
         _currentHp = _unitSelf.Stats.MaxHp.Value;
@@ -17,6 +18,10 @@ public class HealthComponent : MonoBehaviour {
         if (packet.IsCancelled) return;
 
         _currentHp -= packet.DamageAmount;
+        if(!packet.IsIndirect) Debug.Log($"{name} received {packet.DamageAmount} damage");
+        else Debug.Log($"{name} received {packet.DamageAmount} damage. INDIRECT");
         _unitSelf.Events.OnDamageReceived?.Invoke(packet);
+        
+        if(_currentHp <= 0) Destroy(gameObject);
     }
 }

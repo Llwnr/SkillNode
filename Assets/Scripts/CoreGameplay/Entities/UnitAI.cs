@@ -21,6 +21,8 @@ public class UnitAI : MonoBehaviour {
     }
 
     IEnumerator Attack(UnitInstance enemyUnit) {
+        if (enemyUnit == null || enemyUnit.HealthComponent.CurrentHp <= 0) yield break;
+        
         DamagePacket packet = new DamagePacket(self.Stats.AttackDamage.Value, self, enemyUnit);
         self.Events.OnDamageDealing?.Invoke(packet);
 
@@ -30,7 +32,7 @@ public class UnitAI : MonoBehaviour {
         
         enemyUnit.HealthComponent.TakeDamage(packet);
         
-        yield return new WaitForSeconds(3);
+        yield return new WaitForSeconds(1.5f);
         StartCoroutine(Attack(enemyUnit));
     }
 }

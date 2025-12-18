@@ -8,8 +8,17 @@ public class IgniteTrait : Trait {
     [SerializeField]private StatusEffectData effectData;
     
     public override void ApplyTo(TraitInstance instance) {
-        UnitInstance owner = instance.Owner;
+        SetupBurnOnAttack(instance);
+        SetupBurnImmunity(instance);
+    }
 
+    public override void OnRemoval(TraitInstance instance) {
+        //Generally don't need to do much. Let the CleanupAction of TraitInstance handle removal.
+    }
+
+    //Will give the trait holder the ability to inflict burn to its targets when attacking
+    void SetupBurnOnAttack(TraitInstance instance) {
+        UnitInstance owner = instance.Owner;
         Action<DamagePacket> inflictBurnToTarget = (packet) => {
             var runtimeEffectData = new StatusEffectData(
                 effectData.Duration,
@@ -19,14 +28,24 @@ public class IgniteTrait : Trait {
             packet.Target?.ApplyStatusEffect(burnEffectToApply, runtimeEffectData);
         };
         
-        owner.Events.OnDamageDealt += inflictBurnToTarget;
-        
-        instance.CleanupActions.Add(() => {
-            owner.Events.OnDamageDealt -= inflictBurnToTarget;
-        });
+        instance.Subscriptions.Bind(
+            handler: inflictBurnToTarget,
+            subscribe: handler => owner.Events.OnDamageDealt += handler,
+            unsubscribe: handler => owner.Events.OnDamageDealt -= handler
+            );
     }
 
-    public override void OnRemoval(TraitInstance instance) {
-        //Generally don't need to do much. Let the CleanupAction of TraitInstance handle removal.
+    //Makes the owner immune to burn/fire damage
+    void SetupBurnImmunity(TraitInstance instance) {
+        UnitInstance owner = instance.Owner;
+        Action<DamagePacket> immuneToFireDamage = (packet) => {
+            if (packet.DamageType == DamageType.Fire) packet.IsCancelled = true;
+        };
+
+        instance.Subscriptions.Bind(
+            handler: immuneToFireDamage,
+            subscribe: handler => owner.Events.OnDamageReceiving += handler,
+            unsubscribe: handler => owner.Events.OnDamageReceiving -= handler
+        );
     }
 }
