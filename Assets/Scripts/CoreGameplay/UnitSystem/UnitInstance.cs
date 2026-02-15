@@ -7,7 +7,7 @@ using UnityEngine.Serialization;
 
 public class UnitInstance : MonoBehaviour {
     [SerializeField] private UnitBaseConfig unitConfig;
-    private UnitStats _stats; //The runtime changeable and latest stats of the unit.
+    [SerializeField]private UnitStats _stats; //The runtime changeable and latest stats of the unit.
     public UnitStats Stats => _stats;
     
     public List<TraitInstance> _traits = new List<TraitInstance>();
@@ -15,9 +15,11 @@ public class UnitInstance : MonoBehaviour {
 
     public UnitEvents Events { get; private set; } = new UnitEvents();
     public HealthComponent HealthComponent { get; private set; }
+    public UnitController Controller { get; private set; }
 
     private void Awake() {
         _stats = new UnitStats(unitConfig);
+        Controller = GetComponent<UnitController>();
         HealthComponent = GetComponent<HealthComponent>();
     }
 

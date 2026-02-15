@@ -3,7 +3,8 @@
 [CreateAssetMenu(fileName = "UnitConfig", menuName = "Unit/UnitBaseConfig")]
 public class UnitBaseConfig : ScriptableObject {
     public float baseMaxHp;
-    public float baseAttack;
+    public float baseAttackDamage;
+    public float baseAttackSpeed;
     public float baseDefense;
     public float baseMoveSpeed;
 }

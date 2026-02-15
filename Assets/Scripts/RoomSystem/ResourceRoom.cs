@@ -10,8 +10,12 @@ public class ResourceRoom : Room {
         harvestStrength += unit.Stats.AttackDamage.Value;
     }
 
+    public override void OnUnitRemoved(UnitInstance unit) {
+        
+    }
+
     private void Update() {
-        if (Units.Count > 0) {
+        if (MyUnits.Count > 0) {
             timer += Time.deltaTime;
             if (timer > resourceTick) {
                 timer -= resourceTick;

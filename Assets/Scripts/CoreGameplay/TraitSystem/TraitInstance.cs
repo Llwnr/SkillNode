@@ -25,7 +25,7 @@ public class TraitInstance {
     }
 
     public void Apply() {
-        _trait.ApplyTo(this);
+        _trait?.ApplyTo(this);
     }
 
     public void Cleanup() {

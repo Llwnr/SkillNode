@@ -1,0 +1,1420 @@
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\BattleSystem\DamagePacket.cs
+==============================
+
+using System.Collections.Generic;
+
+public enum DamageType {
+    Physical,
+    Fire,
+    Cold,
+    Poison,
+} 
+
+public class DamagePacket {
+    public float DamageAmount;
+    public UnitInstance Attacker;
+    public UnitInstance Target;
+    public bool IsCancelled;
+    public bool IsIndirect;
+    public DamageType DamageType;
+
+    //Visual stuff
+    public List<string> Popups;
+
+    public DamagePacket(float amt, UnitInstance attacker, UnitInstance target) {
+        DamageAmount = amt;
+        Attacker = attacker;
+        Target = target;
+    }
+
+    public DamagePacket Clone() {
+        return (DamagePacket)MemberwiseClone();
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\BattleSystem\WaveGenerator.cs
+==============================
+
+using System;
+using System.Collections;
+using UnityEngine;
+
+public class WaveGenerator : MonoBehaviour {
+    public GameObject enemy;
+    public float waitInterval;
+    public Vector2 startingPos;
+
+    private IEnumerator Start() {
+        yield return new WaitForSeconds(waitInterval);
+        
+        GameObject enemyNew = Instantiate(enemy, transform.root);
+        enemyNew.SetActive(true);
+        enemyNew.transform.position = startingPos;
+        
+        StartCoroutine(Start());
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\Config\FramerateManager.cs
+==============================
+
+using System;
+using UnityEngine;
+
+public class FramerateManager : MonoBehaviour {
+    public int frameRate = 30;
+    private void Start() {
+        Application.targetFrameRate = frameRate;
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\Entities\UnitController.cs
+==============================
+
+using System;
+using System.Collections;
+using System.Threading.Tasks;
+using UnityEngine;
+using PrimeTween;
+
+public class UnitController : MonoBehaviour {
+    private UnitInstance _unit;
+    public Trait trait;
+    public TraitData traitData;
+
+    private bool _canAttack = true;
+
+    private void Start() {
+        _unit = GetComponent<UnitInstance>();
+        _unit.ApplyTrait(trait, traitData);
+    }
+
+    public async Task Chase(UnitInstance targetUnit) {//Chase the enemy target. Parameters set by room.
+        Vector2 distance = targetUnit.transform.position - transform.position;
+        transform.position = targetUnit.transform.position - new Vector3(1,0,0);
+
+        await Attack(targetUnit);
+    }
+
+    public async Task Attack(UnitInstance targetUnit) {
+        while (_canAttack == false) {
+            await Task.Yield();
+        }
+
+        Debug.Log($"{name} is attacking {targetUnit.name}");
+        await Reload();
+        Attack(targetUnit);
+    }
+
+    async Task Reload() {
+        _canAttack = false;
+        float waitDuration = 1/_unit.Stats.AttackSpeed.Value;
+        while (_canAttack == false) {
+            waitDuration -= Time.deltaTime;
+            if (waitDuration <= 0) {
+                _canAttack = true;
+                break;
+            }
+            await Task.Yield();
+        }
+    }
+
+    public void Behaviour() {
+        // If in Range -> Attack -> Chase and reload/attack delay -> Repeat
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\StatusEffectSystem\Implementations\BurnEffect.cs
+==============================
+
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "BurnEffect", menuName = "StatusEffects/BurnEffect")]
+public class BurnEffect : StatusEffect{
+    public override void OnTick(StatusEffectInstance instance) {
+        StatusEffectData data = instance.EffectData;
+        float dmgValue = data.StackCount * data.Magnitude;
+        DamagePacket dmgPacket = new DamagePacket(dmgValue, null, instance.Owner);
+        dmgPacket.IsIndirect = true;
+        dmgPacket.DamageType = DamageType.Fire;
+        instance.Owner.HealthComponent.TakeDamage(dmgPacket);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\StatusEffectSystem\Implementations\FrostEffect.cs
+==============================
+
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "FrostEffect", menuName = "StatusEffects/FrostEffect")]
+public class FrostEffect : StatusEffect {
+    public float slowDebuff;
+    public override void ApplyTo(StatusEffectInstance instance) {
+        instance.Owner.Stats.MoveSpeed.AddModifier(-slowDebuff, true);
+        Debug.Log($"Applied frost to {instance.Owner.name}");
+    }
+
+    public override void OnRemoval(StatusEffectInstance instance) {
+        instance.Owner.Stats.MoveSpeed.RemoveModifier(-slowDebuff, true);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\StatusEffectSystem\StatusEffect.cs
+==============================
+
+using UnityEngine;
+
+public abstract class StatusEffect : ScriptableObject {
+    public string effectId;
+    public new string name;
+    [TextArea(3,10)]
+    public string description;
+
+    public bool isDurationBased = true;
+    public float tickInterval = 1.0f;
+    
+    
+    public virtual void ApplyTo(StatusEffectInstance instance){}
+    public virtual void OnTick(StatusEffectInstance instance){}
+    public virtual void OnRemoval(StatusEffectInstance instance){}
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\StatusEffectSystem\StatusEffectData.cs
+==============================
+
+[System.Serializable]
+public class StatusEffectData {
+    public float Duration;
+    public int StackCount;
+    public float Magnitude;//Generic power value of the status effect
+
+    public StatusEffectData(float duration, int stackCount, float magnitude) {
+        Duration = duration;
+        StackCount = stackCount;
+        Magnitude = magnitude;
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\StatusEffectSystem\StatusEffectInstance.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class StatusEffectInstance {
+    public StatusEffect StatusEffect { get; private set; }
+    public StatusEffectData EffectData { get; private set; }
+    public UnitInstance Owner { get; private set; }
+
+    public List<Action> CleanupActions = new List<Action>();
+
+    private float _tickTimer = 0f;
+    private float _durationTimer = 0f;
+    
+    public StatusEffectInstance(StatusEffect statusEffect, UnitInstance owner, StatusEffectData effectData) {
+        StatusEffect = statusEffect;
+        Owner = owner;
+        _durationTimer = effectData.Duration;
+
+        EffectData = new StatusEffectData(
+            effectData.Duration,
+            effectData.StackCount,
+            effectData.Magnitude
+        );
+    }
+
+    public void Update(float deltaTime) {
+        if (!StatusEffect.isDurationBased) return;
+
+        _durationTimer -= deltaTime;
+        if (_durationTimer <= 0) {
+            Owner.RemoveStatusEffect(StatusEffect);
+            return;
+        }
+
+        if (StatusEffect.tickInterval > 0f) {
+            _tickTimer += deltaTime;
+            if (_tickTimer >= StatusEffect.tickInterval) {
+                _tickTimer -= StatusEffect.tickInterval;
+                StatusEffect.OnTick(this);
+            }
+        }
+    }
+
+    public void AddStacks(int stackAmt) {
+        EffectData.StackCount += stackAmt;
+    }
+
+    public void Refresh() {
+        if (StatusEffect.isDurationBased) {
+            _durationTimer = EffectData.Duration;
+        }
+        
+    }
+
+    public void Apply() {
+        StatusEffect.ApplyTo(this);
+    }
+
+    public void Remove() {
+        foreach (var cleanupAction in CleanupActions) {
+            cleanupAction.Invoke();
+        }
+        CleanupActions.Clear();
+        StatusEffect.OnRemoval(this);
+    }
+    
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\TraitSystem\Implementations\IgniteTrait.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "IgniteTrait", menuName = "Traits/IgniteTrait")]
+public class IgniteTrait : Trait {
+    [SerializeField]private StatusEffect burnEffectToApply;
+    [SerializeField]private StatusEffectData effectData;
+    
+    public override void ApplyTo(TraitInstance instance) {
+        SetupBurnOnAttack(instance);
+        SetupBurnImmunity(instance);
+    }
+
+    public override void OnRemoval(TraitInstance instance) {
+        //Generally don't need to do much. Let the CleanupAction of TraitInstance handle removal.
+    }
+
+    //Will give the trait holder the ability to inflict burn to its targets when attacking
+    void SetupBurnOnAttack(TraitInstance instance) {
+        UnitInstance owner = instance.Owner;
+        Action<DamagePacket> inflictBurnToTarget = (packet) => {
+            var runtimeEffectData = new StatusEffectData(
+                effectData.Duration,
+                instance.TraitData.StackCount,
+                effectData.Magnitude
+            );
+            packet.Target?.ApplyStatusEffect(burnEffectToApply, runtimeEffectData);
+        };
+        
+        instance.Subscriptions.Bind(
+            handler: inflictBurnToTarget,
+            subscribe: handler => owner.Events.OnDamageDealt += handler,
+            unsubscribe: handler => owner.Events.OnDamageDealt -= handler
+            );
+    }
+
+    //Makes the owner immune to burn/fire damage
+    void SetupBurnImmunity(TraitInstance instance) {
+        UnitInstance owner = instance.Owner;
+        Action<DamagePacket> immuneToFireDamage = (packet) => {
+            if (packet.DamageType == DamageType.Fire) packet.IsCancelled = true;
+        };
+
+        instance.Subscriptions.Bind(
+            handler: immuneToFireDamage,
+            subscribe: handler => owner.Events.OnDamageReceiving += handler,
+            unsubscribe: handler => owner.Events.OnDamageReceiving -= handler
+        );
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\TraitSystem\Trait.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using UnityEngine;
+
+public abstract class Trait : ScriptableObject {
+    public new string name;
+    [TextArea(3,10)]
+    public string description;
+
+    //Trait logic goes here. Subscribe to gameplay events to activate trait effects essentially
+    public abstract void ApplyTo(TraitInstance instance);
+    public virtual void OnRemoval(TraitInstance instance){}
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\TraitSystem\TraitData.cs
+==============================
+
+[System.Serializable]
+public class TraitData {
+    public int StackCount;
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\TraitSystem\TraitInstance.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+
+public class TraitInstance {
+    private Trait _trait;
+    public Type TraitType => _trait.GetType();
+    
+    private UnitInstance _owner;
+    public UnitInstance Owner => _owner;
+    private TraitData _traitData;
+    public TraitData TraitData => _traitData;
+
+    public readonly SubscriptionManager Subscriptions = new SubscriptionManager();
+    
+    public TraitInstance(Trait trait, UnitInstance owner, TraitData traitData) {
+        _trait = trait;
+        _owner = owner;
+        _traitData = new TraitData {
+            StackCount = traitData.StackCount,
+        };
+    }
+
+    public void AddStacks(int amount) {
+        _traitData.StackCount += amount;
+    }
+
+    public void Apply() {
+        _trait?.ApplyTo(this);
+    }
+
+    public void Cleanup() {
+        Subscriptions.Dispose();
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\UnitSystem\HealthComponent.cs
+==============================
+
+using System;
+using UnityEngine;
+
+public class HealthComponent : MonoBehaviour {
+    [SerializeField] private UnitInstance _unitSelf;
+    [SerializeField]private float _currentHp;
+    public float CurrentHp => _currentHp;
+    
+    private void Start() {
+        _currentHp = _unitSelf.Stats.MaxHp.Value;
+    }
+
+    public void TakeDamage(DamagePacket dmgPacket) {
+        DamagePacket packet = dmgPacket.Clone();
+        _unitSelf.Events.OnDamageReceiving?.Invoke(packet);
+        
+        //Once packet is manipulated.
+        if (packet.IsCancelled) return;
+        
+        if (!packet.IsIndirect) {
+            packet.DamageAmount *= 1 / _unitSelf.Stats.Defense.Value;
+        }
+
+        _currentHp -= packet.DamageAmount;
+        
+        if(!packet.IsIndirect) Debug.Log($"{name} received {packet.DamageAmount} damage");
+        else Debug.Log($"{name} received {packet.DamageAmount} damage. INDIRECT");
+        
+        _unitSelf.Events.OnDamageReceived?.Invoke(packet);
+        
+        if(_currentHp <= 0) Destroy(gameObject);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\UnitSystem\Stat.cs
+==============================
+
+using System.Collections.Generic;
+using UnityEngine;
+
+[System.Serializable]
+public class Stat {
+    [SerializeField] private float _baseValue;
+    
+    private List<float> _flatModifiers = new List<float>();
+    private List<float> _multModifiers = new List<float>();
+
+    private float _cachedValue;
+    private bool _isDirty = true;
+
+    public float Value{
+        get {
+            if(_isDirty) Recalculate();
+            return _cachedValue;
+        }
+    }
+
+    public Stat(float baseValue) {
+        _baseValue = baseValue;
+    }
+
+    public void AddModifier(float amount, bool isMultiplier) {
+        if (isMultiplier) {
+            _multModifiers.Add(amount);
+        }
+        else {
+            _flatModifiers.Add(amount);
+        }
+        _isDirty = true;
+    }
+
+    public void RemoveModifier(float amount, bool isMultiplier) {
+        if (isMultiplier) {
+            _multModifiers.Remove(amount);
+        }
+        else {
+            _flatModifiers.Remove(amount);
+        }
+        _isDirty = true;
+    }
+
+    void Recalculate() {
+        float finalValue = _baseValue;
+
+        foreach (var flatMod in _flatModifiers) {
+            finalValue += flatMod;
+        }
+
+        float sumOfMult = GetSumOfMultiplierMods();
+
+        finalValue *= (1f + sumOfMult);
+
+        _cachedValue = Mathf.Max(0,finalValue);
+        _isDirty = false;
+    }
+
+    private float GetSumOfMultiplierMods() {
+        float sumOfMult = 0f;
+        foreach (var multMod in _multModifiers) {
+            sumOfMult += multMod;
+        }
+
+        return sumOfMult;
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\UnitSystem\UnitBaseConfig.cs
+==============================
+
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "UnitConfig", menuName = "Unit/UnitBaseConfig")]
+public class UnitBaseConfig : ScriptableObject {
+    public float baseMaxHp;
+    public float baseAttackDamage;
+    public float baseAttackSpeed;
+    public float baseDefense;
+    public float baseMoveSpeed;
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\UnitSystem\UnitEvents.cs
+==============================
+
+using System;
+
+public class UnitEvents {
+    public Action<DamagePacket> OnDamageDealing;
+    public Action<DamagePacket> OnDamageReceiving;
+    
+    public Action<DamagePacket> OnDamageDealt;
+    public Action<DamagePacket> OnDamageReceived;
+    
+    public Action OnDeath;
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\UnitSystem\UnitInstance.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using JetBrains.Annotations;
+using UnityEngine;
+using UnityEngine.Serialization;
+
+public class UnitInstance : MonoBehaviour {
+    [SerializeField] private UnitBaseConfig unitConfig;
+    [SerializeField]private UnitStats _stats; //The runtime changeable and latest stats of the unit.
+    public UnitStats Stats => _stats;
+    
+    public List<TraitInstance> _traits = new List<TraitInstance>();
+    public List<StatusEffectInstance> _statusEffects = new List<StatusEffectInstance>();
+
+    public UnitEvents Events { get; private set; } = new UnitEvents();
+    public HealthComponent HealthComponent { get; private set; }
+    public UnitController Controller { get; private set; }
+
+    private void Awake() {
+        _stats = new UnitStats(unitConfig);
+        Controller = GetComponent<UnitController>();
+        HealthComponent = GetComponent<HealthComponent>();
+    }
+
+    private void Update() {
+        UpdateStatusEffectsTimer(Time.deltaTime);
+    }
+
+    #region Status Effect Management
+
+    public void ApplyStatusEffect(StatusEffect effect, StatusEffectData effectData) {
+        StatusEffectInstance existingEffect = _statusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
+        if (existingEffect != null) {
+            existingEffect.AddStacks(effectData.StackCount);
+            existingEffect.Refresh();
+            return;
+        }
+
+        StatusEffectInstance effectInstance = new StatusEffectInstance(effect, this, effectData);
+        effectInstance.Apply();
+        _statusEffects.Add(effectInstance);
+    }
+
+    public void RemoveStatusEffect(StatusEffect effect) {
+        StatusEffectInstance existingEffect = _statusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
+        if (existingEffect != null) {
+            existingEffect.Remove();
+            _statusEffects.Remove(existingEffect);
+        }
+    }
+
+    void UpdateStatusEffectsTimer(float deltaTime) {
+        for (int i = _statusEffects.Count - 1; i >= 0; i--) {
+            _statusEffects[i].Update(deltaTime);
+        }
+    }
+    #endregion
+    
+    #region Trait Management
+    
+    public void ApplyTrait(Trait trait, TraitData traitData) {
+        TraitInstance existingTrait =  _traits.FirstOrDefault(t => t.TraitType == trait.GetType());
+        //Check if trait is unique
+        if (existingTrait != null){
+            existingTrait.AddStacks(traitData.StackCount);
+            return;
+        }
+        //If trait is unique and hasn't been added
+        TraitInstance traitInstance = new TraitInstance(trait, this, traitData);
+        traitInstance.Apply();
+        _traits.Add(traitInstance);
+    }
+
+    public void RemoveTrait(Trait trait) {
+        TraitInstance traitInstance = _traits.FirstOrDefault(t => t.TraitType == trait.GetType());
+        if (traitInstance != null) {
+            traitInstance.Cleanup();
+            _traits.Remove(traitInstance);
+        }
+    }
+
+    //How to handle trait removal when the object is destroyed..?
+    void HandleTraitRemoval() {
+        foreach (var traitInstance in _traits) {
+            traitInstance.Cleanup();
+        }
+        _traits.Clear();
+    }
+    #endregion
+
+    private void OnDestroy() {
+        HandleTraitRemoval();
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\UnitSystem\UnitStats.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+[Serializable]
+public class UnitStats {
+    public Stat MaxHp;
+    
+    public Stat AttackDamage;
+    public Stat AttackSpeed;
+    
+    public Stat MoveSpeed;
+    public Stat Defense;
+
+    public UnitStats(UnitBaseConfig config) {
+        MaxHp = new Stat(config.baseMaxHp);
+        AttackDamage = new Stat(config.baseAttackDamage);
+        AttackSpeed = new Stat(config.baseAttackSpeed);
+        MoveSpeed = new Stat(config.baseMoveSpeed);
+        Defense = new Stat(config.baseDefense);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\TraitTester.cs
+==============================
+
+using System;
+using UnityEngine;
+
+public class TraitTester : MonoBehaviour {
+    public UnitInstance unit;
+    public UnitInstance enemy;
+    public Trait igniteTrait;
+
+    public void GiveIgniteTrait() {
+        unit.ApplyTrait(igniteTrait, new TraitData{StackCount = 5});
+    }
+
+    public void DealDamageToUnit() {
+        unit.Events.OnDamageDealt?.Invoke(new DamagePacket(999, unit, enemy));
+    }
+
+    public void RemoveTrait() {
+        unit.RemoveTrait(igniteTrait);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\GridSystem\GridManager.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class GridManager : MonoBehaviour {
+    public static GridManager Instance { get; private set; }
+
+    [Header("Settings")]
+    [SerializeField] private int width = 10;
+    [SerializeField] private int height = 10;
+    [SerializeField] private float cellSize = 2f;
+    [SerializeField] private Vector3 originPosition;
+    [SerializeField] private bool showDebugGizmos = true;
+
+    private Vector3 _offset;
+
+    public GridSystem<GridObject> Grid { get; private set; }
+
+    private void Awake() {
+        if (Instance != null) Destroy(gameObject);
+        Instance = this;
+
+        // Initialize the grid
+        Grid = new GridSystem<GridObject>(width, height, cellSize, originPosition, 
+            (GridSystem<GridObject> g, Vector2Int coords) => new GridObject(g, coords));
+    }
+
+    private void Start() {
+        _offset = Vector3.one * cellSize * 0.5f;
+    }
+
+    #region Helpers 
+    //Shortcuts so you don't have to get the GridSystem itself.
+    public Vector3 GetWorldPosition(Vector2Int gridPos) => Grid.GetWorldPosition(gridPos);
+    public Vector2Int GetGridPosition(Vector3 worldPos) => Grid.GetGridPosition(worldPos);
+    public GridObject GetGridObject(Vector2Int gridPos) => Grid.GetGridObject(gridPos);
+    public bool IsValidGridPosition(Vector2Int gridPos) => Grid.IsValidGridPosition(gridPos);
+    #endregion
+    
+    #region Actions, Movement
+    public void MoveCharacter(UnitInstance character, Vector2Int targetCoords) {
+        if (!IsValidGridPosition(targetCoords)) return;
+        
+        Vector2Int startCoords = GetGridPosition(character.transform.position);
+        //If character wants to move at where it is currently, then do nothing
+        if (startCoords == targetCoords) {
+            // Debug.LogWarning($"Cel {startCoords} is already occupied by oneself i.e. {character.name}");
+            return;
+        }
+
+        if (!IsTileInRange(startCoords, targetCoords, 3, false)) return;
+        
+        GridObject startCell = GetGridObject(startCoords);
+        GridObject targetCell = GetGridObject(targetCoords);
+        
+        if (targetCell.IsOccupied()) {
+            // Debug.LogWarning($"Cell {nearestCoordToTarget} is already occupied by {targetCell.CharacterOnTile.name}");
+            return;
+        }
+        
+        if (startCell.CharacterOnTile == character) {
+            startCell.ClearCharacter();
+        }
+        targetCell.SetCharacter(character);
+
+        // Update Visuals
+        Vector3 worldPos = GetWorldPosition(targetCoords) + _offset;
+        character.transform.position = worldPos;
+        
+        // Debug.Log($"{character.name} moved to {nearestCoordToTarget}");
+    }
+
+    public void SnapToGrid(UnitInstance character) {
+        Vector2Int pos = GetGridPosition(character.transform.position);
+        if (IsValidGridPosition(pos)) {
+            GetGridObject(pos).SetCharacter(character);
+            character.transform.position = GetWorldPosition(pos) + _offset;
+        }
+    }
+    #endregion
+    
+    #region Tile queries, finding range etc
+
+    public List<Vector2Int> GetTilesInRange(Vector2Int startPos, int range, bool ignoreOccupants = false) {
+        List<Vector2Int> validCells = new List<Vector2Int>();
+        Queue<Vector2Int> queue = new Queue<Vector2Int>();
+        Dictionary<Vector2Int, int> distances = new Dictionary<Vector2Int, int>();
+
+        queue.Enqueue(startPos);
+        distances[startPos] = 0;
+        // Optional: Add startPos to validCells if you want the center included
+        validCells.Add(startPos); 
+
+        Vector2Int[] directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+
+        while (queue.Count > 0) {
+            Vector2Int current = queue.Dequeue();
+            int currentDist = distances[current];
+
+            if (currentDist >= range) continue;
+
+            foreach (Vector2Int dir in directions) {
+                Vector2Int neighbor = current + dir;
+
+                if (!Grid.IsValidGridPosition(neighbor)) continue;
+                if (distances.ContainsKey(neighbor)) continue;
+
+                // Movement Logic: If we can't walk through it, don't add to queue
+                bool isOccupied = Grid.GetGridObject(neighbor).IsOccupied();
+                if (!ignoreOccupants && isOccupied) continue;
+
+                distances[neighbor] = currentDist + 1;
+                queue.Enqueue(neighbor);
+                validCells.Add(neighbor);
+            }
+        }
+        return validCells;
+    }
+    
+    public List<Vector2Int> GetTilesInRange(Vector3 worldPos, int range, bool ignoreOccupants = false) {
+        return GetTilesInRange(GetGridPosition(worldPos), range, ignoreOccupants);
+    }
+
+    public bool IsTileInRange(Vector2Int start, Vector2Int end, int range, bool ignoreOccupants) {
+        int pureDist = Mathf.Abs(start.x - end.x) + Mathf.Abs(start.y - end.y);
+        if (pureDist > range) return false;
+
+        return GetTilesInRange(start, range, ignoreOccupants).Contains(end);
+    }
+    #endregion
+
+    // Built-in Unity method for drawing debug visuals in Scene view
+    private void OnDrawGizmos() {
+        if (!showDebugGizmos || Grid == null) return;
+
+        for (int x = 0; x < Grid.Width; x++) {
+            for (int y = 0; y < Grid.Height; y++) {
+                // Draw Cell Borders
+                Vector3 worldPos = Grid.GetWorldPosition(x, y);
+                Gizmos.color = Color.white;
+                Gizmos.DrawLine(worldPos, worldPos + Vector3.up * Grid.CellSize);
+                Gizmos.DrawLine(worldPos, worldPos + Vector3.right * Grid.CellSize);
+                
+                // Optional: Draw Center
+                Gizmos.color = Color.red;
+                Gizmos.DrawSphere(worldPos + new Vector3(Grid.CellSize, Grid.CellSize) * 0.5f, 0.1f);
+            }
+        }
+        
+        // Draw outer borders
+        Gizmos.color = Color.white;
+        Gizmos.DrawLine(Grid.GetWorldPosition(0, Grid.Height), Grid.GetWorldPosition(Grid.Width, Grid.Height));
+        Gizmos.DrawLine(Grid.GetWorldPosition(Grid.Width, Grid.Height), Grid.GetWorldPosition(Grid.Width, 0));
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\GridSystem\GridObject.cs
+==============================
+
+using UnityEngine;
+
+public class GridObject {
+    private GridSystem<GridObject> _gridSystem;
+    private Vector2Int _gridCoords;
+    
+    public UnitInstance CharacterOnTile { get; private set; }
+
+    public GridObject(GridSystem<GridObject> gridSystem, Vector2Int coords) {
+        _gridSystem = gridSystem;
+        _gridCoords = coords;
+    }
+
+    public void SetCharacter(UnitInstance character) {
+        CharacterOnTile = character;
+    }
+
+    public void ClearCharacter() {
+        CharacterOnTile = null;
+    }
+
+    public bool IsOccupied() {
+        return CharacterOnTile != null;
+    }
+
+    public override string ToString() {
+        return $"[{_gridCoords.x}, {_gridCoords.y}] \n {(CharacterOnTile ? CharacterOnTile.name : "Empty")}";
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\GridSystem\GridSystem.cs
+==============================
+
+using UnityEngine;
+using System;
+using System.Collections.Generic;
+
+public class GridSystem<TGridObject> {
+    public int Width { get; private set; }
+    public int Height { get; private set; }
+    public float CellSize { get; private set; }
+    
+    private Vector3 _originPos;
+    private TGridObject[,] _gridArray;
+
+    // Constructor
+    public GridSystem(int width, int height, float cellSize, Vector3 originPos, Func<GridSystem<TGridObject>, Vector2Int, TGridObject> createGridObject) {
+        Width = width;
+        Height = height;
+        CellSize = cellSize;
+        _originPos = originPos;
+
+        _gridArray = new TGridObject[width, height];
+
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                Vector2Int coords = new Vector2Int(x, y);
+                _gridArray[x, y] = createGridObject(this, coords);
+            }
+        }
+    }
+
+    public Vector3 GetWorldPosition(Vector2Int gridPos) {
+        return new Vector3(gridPos.x, gridPos.y) * CellSize + _originPos;
+    }
+    
+    // Overload for individual ints if needed
+    public Vector3 GetWorldPosition(int x, int y) => GetWorldPosition(new Vector2Int(x, y));
+
+    public Vector2Int GetGridPosition(Vector3 worldPos) {
+        Vector3 relativePos = worldPos - _originPos;
+        int x = Mathf.FloorToInt(relativePos.x / CellSize);
+        int y = Mathf.FloorToInt(relativePos.y / CellSize);
+        return new Vector2Int(x, y);
+    }
+
+    public TGridObject GetGridObject(Vector2Int gridPos) {
+        if (!IsValidGridPosition(gridPos)) return default;
+        return _gridArray[gridPos.x, gridPos.y];
+    }
+
+    public TGridObject GetGridObject(Vector3 worldPos) {
+        return GetGridObject(GetGridPosition(worldPos));
+    }
+
+    public bool IsValidGridPosition(Vector2Int gridPos) {
+        return gridPos.x >= 0 && gridPos.y >= 0 && gridPos.x < Width && gridPos.y < Height;
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\RoomSystem\BattleRoom.cs
+==============================
+
+using UnityEngine;
+
+public class BattleRoom : Room {
+    [SerializeField] private float atkBuff, maxHpBuff, movespeedBuff, defenseBuff;
+    public override void OnUnitPlaced(UnitInstance unit) {
+        unit.Stats.AttackDamage.AddModifier(atkBuff, false);
+        unit.Stats.MaxHp.AddModifier(maxHpBuff, false);
+        unit.Stats.Defense.AddModifier(defenseBuff, false);
+        unit.Stats.MoveSpeed.AddModifier(movespeedBuff, false);
+    }
+
+    public override void OnUnitRemoved(UnitInstance unit) {
+        Debug.Log($"OnUnitRemoved {unit}");
+        unit.Stats.AttackDamage.RemoveModifier(atkBuff, false);
+        unit.Stats.MaxHp.RemoveModifier(maxHpBuff, false);
+        unit.Stats.Defense.RemoveModifier(defenseBuff, false);
+        unit.Stats.MoveSpeed.RemoveModifier(movespeedBuff, false);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\RoomSystem\ResourceRoom.cs
+==============================
+
+using System;
+using UnityEngine;
+
+public class ResourceRoom : Room {
+    public float resourceTick = 1f;
+    public float timer = 0f;
+
+    private float harvestStrength = 1f;
+    public override void OnUnitPlaced(UnitInstance unit) {
+        harvestStrength += unit.Stats.AttackDamage.Value;
+    }
+
+    public override void OnUnitRemoved(UnitInstance unit) {
+        
+    }
+
+    private void Update() {
+        if (MyUnits.Count > 0) {
+            timer += Time.deltaTime;
+            if (timer > resourceTick) {
+                timer -= resourceTick;
+                Debug.Log($"Harvest {harvestStrength} resources every second");
+            }
+        }
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\RoomSystem\Room.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using UnityEngine;
+
+public abstract class Room : MonoBehaviour {
+    protected List<UnitInstance> MyUnits = new List<UnitInstance>();
+    protected List<UnitInstance> EnemyUnits = new List<UnitInstance>();
+
+    private void Start() {
+        foreach (var unitInstance in GetComponentsInChildren<UnitInstance>()) {
+            TryPlaceUnit(unitInstance);
+        }
+    }
+
+    public abstract void OnUnitPlaced(UnitInstance unit);
+    public abstract void OnUnitRemoved(UnitInstance unit);
+
+    private async void OnTriggerEnter2D(Collider2D other) {
+        if (other.transform.TryGetComponent(out UnitInstance unit)) {
+            if (MyUnits.Contains(unit)) {
+                return;
+            }
+            await EnemyUnitEnter(unit);
+        }
+    }
+
+    public async Task EnemyUnitEnter(UnitInstance enemyUnit){
+        EnemyUnits.Add(enemyUnit);
+        foreach (var unit in MyUnits) {
+            await unit.Controller.Chase(enemyUnit);
+        }
+    }
+
+    public bool TryPlaceUnit(UnitInstance unit) {
+        if (unit == null) return false;
+        
+        MyUnits.Add(unit);
+        
+        OnUnitPlaced(unit);
+        return true;
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Data\StatKeys.cs
+==============================
+
+public static class StatKeys {
+    public const string HealthCost = "HealthCost";
+    public const string CastDelay = "CastDelay";
+    public const string CritChance = "CritChance";
+    public const string RNG_Seed = "RNG_Seed";
+    
+    // Element Specific
+    public const string BurnDuration = "BurnDuration";
+    public const string FreezeAmount = "FreezeAmount";
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Data\StatusKeys.cs
+==============================
+
+public static class StatusKeys {
+    public const string Armored = "Armored";
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\DragDropSystem\DropZones\RoomDropHandler.cs
+==============================
+
+using System;
+using UnityEngine;
+using UnityEngine.EventSystems;
+
+[RequireComponent(typeof(Room))]
+public class RoomDropHandler : DropHandler{
+    private Room _room;
+
+    private void Start() {
+        _room = GetComponent<Room>();
+    }
+
+    public override bool DropCondition(PointerEventData eventData) {
+        return (eventData.pointerDrag != null && eventData.pointerDrag.GetComponent<UnitInstance>() != null);
+    }
+
+    public override void OnDropSuccess(PointerEventData eventData) {
+        UnitInstance unit = eventData.pointerDrag.GetComponent<UnitInstance>();
+        if (unit != null && _room.TryPlaceUnit(unit)) {
+            unit.transform.SetParent(transform);
+        }
+    }
+
+    public override void OnPickedUp(PointerEventData eventData) {
+        UnitInstance unit = eventData.pointerDrag.GetComponent<UnitInstance>();
+        if (unit != null) {
+            _room.OnUnitRemoved(unit);
+        }
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\DragDropSystem\DragContext.cs
+==============================
+
+using UnityEngine;
+
+public class DragContext {
+    public Sprite Icon;
+    public GameObject ReferencedObject;
+
+    public DragContext(Sprite icon, GameObject referencedObject) {
+        Icon = icon;
+        ReferencedObject = referencedObject;
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\DragDropSystem\Draggable.cs
+==============================
+
+using System;
+using System.Drawing;
+using UnityEngine;
+using UnityEngine.EventSystems;
+
+public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler {
+    private DragContext _dragContext;
+    
+    private RectTransform _rectTransform;
+    private CanvasGroup _canvasGroup;
+    private Vector3 _startPosition;
+    private Transform _startParent;
+
+    public Action<PointerEventData> OnDragStart;
+    
+    private void Awake(){
+        _rectTransform =  GetComponent<RectTransform>();
+        _canvasGroup =  GetComponent<CanvasGroup>();
+        if (_canvasGroup == null){
+            _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+        }
+    }
+
+    public void OnBeginDrag(PointerEventData eventData){
+        _startPosition = _rectTransform.position;
+        _startParent = transform.parent;
+        
+        GameObject draggedObject = eventData.pointerDrag;
+        _dragContext = new DragContext(draggedObject.GetComponent<Sprite>(), draggedObject);
+        
+        _canvasGroup.alpha = 0.6f;
+        _canvasGroup.blocksRaycasts = false;
+        transform.SetParent(transform.root);
+
+        OnDragStart?.Invoke(eventData);
+    }
+
+    public void OnDrag(PointerEventData eventData){
+        transform.position = Input.mousePosition;
+    }
+
+    public void OnEndDrag(PointerEventData eventData){
+        _canvasGroup.alpha = 1f;
+        _canvasGroup.blocksRaycasts = true;
+        if (transform.parent == transform.root) {
+            Reset(eventData);
+        }
+    }
+
+    private void Reset(PointerEventData eventData) {
+        transform.position = _startPosition;
+        transform.SetParent(_startParent);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\DragDropSystem\DropHandler.cs
+==============================
+
+using System;
+using UnityEngine;
+using UnityEngine.EventSystems;
+
+public abstract class DropHandler : MonoBehaviour, IDropHandler {
+    public abstract bool DropCondition(PointerEventData eventData);
+    public abstract void OnDropSuccess(PointerEventData eventData);
+
+    public void OnDrop(PointerEventData eventData) {
+        if (DropCondition(eventData)) {
+            ListenForPickup(eventData);
+            OnDropSuccess(eventData);
+        }
+    }
+
+    void ListenForPickup(PointerEventData eventData) {
+        if (eventData.pointerDrag.TryGetComponent<Draggable>(out var draggable)) {
+            draggable.OnDragStart += OnPickedUp;
+        }
+
+        if (eventData.pointerDrag.TryGetComponent<WorldSpaceDraggable>(out var worldDraggable)) {
+            worldDraggable.OnDragStart += OnPickedUp;
+        }
+    }
+
+    public abstract void OnPickedUp(PointerEventData eventData);
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\DragDropSystem\WorldSpaceDraggable.cs
+==============================
+
+using System;
+using System.Drawing;
+using UnityEngine;
+using UnityEngine.EventSystems;
+
+public class WorldSpaceDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler {
+    public GameObject runtimeObject;
+    private Vector3 _startPosition;
+    private Transform _startParent;
+
+    private Collider2D _collider2D;
+
+    public Action<PointerEventData> OnDragStart;
+
+    private void Awake() {
+        _collider2D = GetComponent<Collider2D>();
+    }
+
+    public void OnBeginDrag(PointerEventData eventData){
+        _startPosition = transform.position;
+        _startParent = transform.parent;
+        
+        transform.SetParent(transform.root);
+
+        _collider2D.enabled = false;
+
+        OnDragStart?.Invoke(eventData);
+        OnDragStart = null;
+    }
+
+    public void OnDrag(PointerEventData eventData) {
+        Vector3 mouseToWorldPos = Camera.main.ScreenToWorldPoint(eventData.position);
+        mouseToWorldPos.z = transform.position.z;
+        transform.position = mouseToWorldPos;
+    }
+
+    public void OnEndDrag(PointerEventData eventData){
+        _collider2D.enabled = true;
+        if (transform.parent == transform.root) {
+            Reset(eventData);
+        }
+    }
+
+    private void Reset(PointerEventData eventData){
+        transform.position = _startPosition;
+        _startParent.GetComponent<DropHandler>()?.OnDrop(eventData);
+        transform.SetParent(_startParent);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\Popup.cs
+==============================
+
+using System;
+using UnityEngine;
+using PrimeTween;
+using TMPro;
+
+public class Popup : MonoBehaviour {
+    private UnitInstance _unit;
+    public TextMeshProUGUI popupBoxPrefab;
+    public Canvas container;
+    public float duration;
+
+    private void Start() {
+        _unit = GetComponent<UnitInstance>();
+        _unit.Events.OnDamageReceived += DisplayPopup;
+    }
+
+    void DisplayPopup(DamagePacket dmgPacket) {
+        TextMeshProUGUI popup = Instantiate(popupBoxPrefab, container.transform);
+        popup.transform.position = Camera.main.WorldToScreenPoint(_unit.transform.position);
+        
+        popup.SetText(dmgPacket.DamageAmount.ToString("F1"));
+        
+        float finalDuration = dmgPacket.IsIndirect ? duration * 0.5f : duration;
+        float finalHeight = popup.transform.position.y + 100;
+        finalHeight -= dmgPacket.IsIndirect ? 50 : 0;
+        Tween.PositionY(popup.transform, endValue: finalHeight, duration: finalDuration, ease: Ease.InOutSine)
+            .OnComplete(() => Destroy(popup.gameObject));
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\UIFollowWorldspace.cs
+==============================
+
+using System;
+using UnityEngine;
+
+public class UIFollowWorldspace : MonoBehaviour {
+    [SerializeField] private GameObject worldspaceTarget;
+    [SerializeField] private Vector2 offset;
+
+    private void Start() {
+        FollowTarget();
+    }
+
+    private void FixedUpdate() {
+        FollowTarget();
+    }
+
+    void FollowTarget() {
+        if (worldspaceTarget != null) {
+            transform.position = Camera.main.WorldToScreenPoint(worldspaceTarget.transform.position + (Vector3)offset);
+        }
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\Utilities\SubscriptionManager.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+
+public class SubscriptionManager {
+    private readonly List<Action> _cleanupActions = new List<Action>();
+    
+    public void Bind<T>(Action<T> handler, Action<Action<T>> subscribe, Action<Action<T>> unsubscribe) {
+        subscribe(handler);
+        //Store unsubscription methods for when you need to dispose
+        _cleanupActions.Add(() => unsubscribe(handler));
+    }
+
+    public void Dispose() {
+        foreach (var cleanupAction in _cleanupActions) {
+            cleanupAction.Invoke();
+        }
+        _cleanupActions.Clear();
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\GameManager.cs
+==============================
+
+using System;
+using UnityEngine;
+
+public class GameManager : MonoBehaviour{
+    public TimePhase CurrentPhase { get; private set; }
+
+    public static GameManager Instance { get; private set; }
+    private void Awake() {
+        if (Instance != null) {
+            Debug.LogError("[GameManager] GameManager already exists");
+            return;
+        }
+
+        Instance = this;
+    }
+}
+
+public enum TimePhase {
+    Day,
+    Night
+}
+

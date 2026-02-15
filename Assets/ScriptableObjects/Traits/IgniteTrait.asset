@@ -16,6 +16,6 @@ MonoBehaviour:
   description: Inflicts burn to enemies.
   burnEffectToApply: {fileID: 11400000, guid: 00e78e97d141d7a4d94eb8b09c2f3cc4, type: 2}
   effectData:
-    Duration: 10
+    Duration: 5
     StackCount: 1
     Magnitude: 1

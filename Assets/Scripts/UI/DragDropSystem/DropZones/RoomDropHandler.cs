@@ -10,15 +10,21 @@ public class RoomDropHandler : DropHandler{
         _room = GetComponent<Room>();
     }
 
-    public override bool Condition(PointerEventData eventData) {
+    public override bool DropCondition(PointerEventData eventData) {
         return (eventData.pointerDrag != null && eventData.pointerDrag.GetComponent<UnitInstance>() != null);
     }
 
-    public override void Action(PointerEventData eventData) {
+    public override void OnDropSuccess(PointerEventData eventData) {
         UnitInstance unit = eventData.pointerDrag.GetComponent<UnitInstance>();
         if (unit != null && _room.TryPlaceUnit(unit)) {
-            eventData.pointerDrag.transform.SetParent(transform);
+            unit.transform.SetParent(transform);
         }
-        
+    }
+
+    public override void OnPickedUp(PointerEventData eventData) {
+        UnitInstance unit = eventData.pointerDrag.GetComponent<UnitInstance>();
+        if (unit != null) {
+            _room.OnUnitRemoved(unit);
+        }
     }
 }

@@ -1,20 +1,17 @@
 ﻿using System;
+using System.Drawing;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler {
-    public GameObject runtimeObject;
+    private DragContext _dragContext;
     
     private RectTransform _rectTransform;
     private CanvasGroup _canvasGroup;
     private Vector3 _startPosition;
     private Transform _startParent;
 
-    public Action OnDragStart;
-
-    public void SetStartParent(Transform startParent) {
-        _startParent = startParent;
-    }
+    public Action<PointerEventData> OnDragStart;
     
     private void Awake(){
         _rectTransform =  GetComponent<RectTransform>();
@@ -28,11 +25,14 @@ public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDra
         _startPosition = _rectTransform.position;
         _startParent = transform.parent;
         
+        GameObject draggedObject = eventData.pointerDrag;
+        _dragContext = new DragContext(draggedObject.GetComponent<Sprite>(), draggedObject);
+        
         _canvasGroup.alpha = 0.6f;
         _canvasGroup.blocksRaycasts = false;
         transform.SetParent(transform.root);
 
-        OnDragStart?.Invoke();
+        OnDragStart?.Invoke(eventData);
     }
 
     public void OnDrag(PointerEventData eventData){

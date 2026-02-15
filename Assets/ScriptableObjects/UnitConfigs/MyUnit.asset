@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 75a14e54d50e4e848180a41188bff7dc, type: 3}
   m_Name: MyUnit
   m_EditorClassIdentifier: 
-  baseMaxHp: 80
-  baseAttack: 10
-  baseDefense: 5
-  baseMoveSpeed: 10
+  baseMaxHp: 100
+  baseAttack: 5
+  baseDefense: 1
+  baseMoveSpeed: 5
