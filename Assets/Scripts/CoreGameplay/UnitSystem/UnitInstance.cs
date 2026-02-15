@@ -23,17 +23,12 @@ public class UnitInstance : MonoBehaviour {
         HealthComponent = GetComponent<HealthComponent>();
     }
 
-    private void Update() {
-        UpdateStatusEffectsTimer(Time.deltaTime);
-    }
-
     #region Status Effect Management
 
     public void ApplyStatusEffect(StatusEffect effect, StatusEffectData effectData) {
         StatusEffectInstance existingEffect = _statusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
         if (existingEffect != null) {
             existingEffect.AddStacks(effectData.StackCount);
-            existingEffect.Refresh();
             return;
         }
 
@@ -50,11 +45,12 @@ public class UnitInstance : MonoBehaviour {
         }
     }
 
-    void UpdateStatusEffectsTimer(float deltaTime) {
-        for (int i = _statusEffects.Count - 1; i >= 0; i--) {
-            _statusEffects[i].Update(deltaTime);
-        }
-    }
+    // [IMPORTANT] -> Replace with forwarding Turn Manager's turn changes.
+    // void UpdateStatusEffectsTimer(float deltaTime) {
+    //     for (int i = _statusEffects.Count - 1; i >= 0; i--) {
+    //         _statusEffects[i].Update(deltaTime);
+    //     }
+    // }
     #endregion
     
     #region Trait Management

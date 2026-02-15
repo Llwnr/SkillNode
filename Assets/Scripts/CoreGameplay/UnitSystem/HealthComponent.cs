@@ -14,7 +14,7 @@ public class HealthComponent : MonoBehaviour {
         DamagePacket packet = dmgPacket.Clone();
         _unitSelf.Events.OnDamageReceiving?.Invoke(packet);
         
-        //Once packet is manipulated.
+        //If something negated the damage to be received.
         if (packet.IsCancelled) return;
         
         if (!packet.IsIndirect) {
@@ -24,7 +24,7 @@ public class HealthComponent : MonoBehaviour {
         _currentHp -= packet.DamageAmount;
         
         if(!packet.IsIndirect) Debug.Log($"{name} received {packet.DamageAmount} damage");
-        else Debug.Log($"{name} received {packet.DamageAmount} damage. INDIRECT");
+        else Debug.Log($"{name} received {packet.DamageAmount} INDIRECT damage.");
         
         _unitSelf.Events.OnDamageReceived?.Invoke(packet);
         
