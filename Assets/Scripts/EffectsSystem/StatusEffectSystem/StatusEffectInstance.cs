@@ -2,15 +2,17 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class StatusEffectInstance {
+public class StatusEffectInstance
+{
     public StatusEffect StatusEffect { get; private set; }
     public StatusEffectData EffectData { get; private set; }
     public UnitInstance Owner { get; private set; }
 
     public List<Action> CleanupActions = new List<Action>();
 
-    
-    public StatusEffectInstance(StatusEffect statusEffect, UnitInstance owner, StatusEffectData effectData) {
+
+    public StatusEffectInstance(StatusEffect statusEffect, UnitInstance owner, StatusEffectData effectData)
+    {
         StatusEffect = statusEffect;
         Owner = owner;
 
@@ -20,20 +22,24 @@ public class StatusEffectInstance {
         );
     }
 
-    public void AddStacks(int stackAmt) {
+    public void AddStacks(int stackAmt)
+    {
         EffectData.StackCount += stackAmt;
     }
 
-    public void Apply() {
+    public void Apply()
+    {
         StatusEffect.ApplyTo(this);
     }
 
-    public void Remove() {
-        foreach (var cleanupAction in CleanupActions) {
+    public void Remove()
+    {
+        foreach (var cleanupAction in CleanupActions)
+        {
             cleanupAction.Invoke();
         }
+
         CleanupActions.Clear();
         StatusEffect.OnRemoval(this);
     }
-    
 }

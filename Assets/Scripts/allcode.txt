@@ -6,57 +6,52 @@ FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\BattleSystem\DamagePacket.cs
 
 using System.Collections.Generic;
 
-public enum DamageType {
+public enum DamageType
+{
     Physical,
     Fire,
     Cold,
     Poison,
-} 
+}
 
-public class DamagePacket {
+// DTO (Data Transfer Object) pattern. 
+// Used to pass context around without coupling the Attacker and Victim directly.
+public class DamagePacket
+{
     public float DamageAmount;
     public UnitInstance Attacker;
     public UnitInstance Target;
-    public bool IsCancelled;
-    public bool IsIndirect;
+    public bool IsCancelled; // Allows traits/abilities to completely nullify damage (e.g. Immunity).
+    public bool IsIndirect; // Flag for DoT (Damage over Time) or environmental damage.
     public DamageType DamageType;
 
-    //Visual stuff
+    //Visual stuff to be implemented later
     public List<string> Popups;
 
-    public DamagePacket(float amt, UnitInstance attacker, UnitInstance target) {
+    public DamagePacket(float amt, UnitInstance attacker, UnitInstance target,
+        DamageType damageType = DamageType.Physical)
+    {
         DamageAmount = amt;
         Attacker = attacker;
         Target = target;
     }
 
-    public DamagePacket Clone() {
-        return (DamagePacket)MemberwiseClone();
+    /* RULE ON INDIRECT:
+     *  Has no attacker. Meaning, cannot pin-point the source applier of the damage
+     *  Ignores all defenses
+     */
+    public DamagePacket SetIndirect()
+    {
+        IsIndirect = true;
+        return this;
     }
-}
 
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\BattleSystem\WaveGenerator.cs
-==============================
-
-using System;
-using System.Collections;
-using UnityEngine;
-
-public class WaveGenerator : MonoBehaviour {
-    public GameObject enemy;
-    public float waitInterval;
-    public Vector2 startingPos;
-
-    private IEnumerator Start() {
-        yield return new WaitForSeconds(waitInterval);
-        
-        GameObject enemyNew = Instantiate(enemy, transform.root);
-        enemyNew.SetActive(true);
-        enemyNew.transform.position = startingPos;
-        
-        StartCoroutine(Start());
+    // Prototype Pattern.
+    // Necessary because C# passes objects by reference. 
+    // Events need to modify a specific instance of a packet without affecting previous logic steps.
+    public DamagePacket Clone()
+    {
+        return (DamagePacket)MemberwiseClone();
     }
 }
 
@@ -77,378 +72,48 @@ public class FramerateManager : MonoBehaviour {
 
 
 ==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\Entities\UnitController.cs
-==============================
-
-using System;
-using System.Collections;
-using System.Threading.Tasks;
-using UnityEngine;
-using PrimeTween;
-
-public class UnitController : MonoBehaviour {
-    private UnitInstance _unit;
-    public Trait trait;
-    public TraitData traitData;
-
-    private bool _canAttack = true;
-
-    private void Start() {
-        _unit = GetComponent<UnitInstance>();
-        _unit.ApplyTrait(trait, traitData);
-    }
-
-    public async Task Chase(UnitInstance targetUnit) {//Chase the enemy target. Parameters set by room.
-        Vector2 distance = targetUnit.transform.position - transform.position;
-        transform.position = targetUnit.transform.position - new Vector3(1,0,0);
-
-        await Attack(targetUnit);
-    }
-
-    public async Task Attack(UnitInstance targetUnit) {
-        while (_canAttack == false) {
-            await Task.Yield();
-        }
-
-        Debug.Log($"{name} is attacking {targetUnit.name}");
-        await Reload();
-        Attack(targetUnit);
-    }
-
-    async Task Reload() {
-        _canAttack = false;
-        float waitDuration = 1/_unit.Stats.AttackSpeed.Value;
-        while (_canAttack == false) {
-            waitDuration -= Time.deltaTime;
-            if (waitDuration <= 0) {
-                _canAttack = true;
-                break;
-            }
-            await Task.Yield();
-        }
-    }
-
-    public void Behaviour() {
-        // If in Range -> Attack -> Chase and reload/attack delay -> Repeat
-    }
-}
-
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\StatusEffectSystem\Implementations\BurnEffect.cs
-==============================
-
-using UnityEngine;
-
-[CreateAssetMenu(fileName = "BurnEffect", menuName = "StatusEffects/BurnEffect")]
-public class BurnEffect : StatusEffect{
-    public override void OnTick(StatusEffectInstance instance) {
-        StatusEffectData data = instance.EffectData;
-        float dmgValue = data.StackCount * data.Magnitude;
-        DamagePacket dmgPacket = new DamagePacket(dmgValue, null, instance.Owner);
-        dmgPacket.IsIndirect = true;
-        dmgPacket.DamageType = DamageType.Fire;
-        instance.Owner.HealthComponent.TakeDamage(dmgPacket);
-    }
-}
-
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\StatusEffectSystem\Implementations\FrostEffect.cs
-==============================
-
-using UnityEngine;
-
-[CreateAssetMenu(fileName = "FrostEffect", menuName = "StatusEffects/FrostEffect")]
-public class FrostEffect : StatusEffect {
-    public float slowDebuff;
-    public override void ApplyTo(StatusEffectInstance instance) {
-        instance.Owner.Stats.MoveSpeed.AddModifier(-slowDebuff, true);
-        Debug.Log($"Applied frost to {instance.Owner.name}");
-    }
-
-    public override void OnRemoval(StatusEffectInstance instance) {
-        instance.Owner.Stats.MoveSpeed.RemoveModifier(-slowDebuff, true);
-    }
-}
-
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\StatusEffectSystem\StatusEffect.cs
-==============================
-
-using UnityEngine;
-
-public abstract class StatusEffect : ScriptableObject {
-    public string effectId;
-    public new string name;
-    [TextArea(3,10)]
-    public string description;
-
-    public bool isDurationBased = true;
-    public float tickInterval = 1.0f;
-    
-    
-    public virtual void ApplyTo(StatusEffectInstance instance){}
-    public virtual void OnTick(StatusEffectInstance instance){}
-    public virtual void OnRemoval(StatusEffectInstance instance){}
-}
-
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\StatusEffectSystem\StatusEffectData.cs
-==============================
-
-[System.Serializable]
-public class StatusEffectData {
-    public float Duration;
-    public int StackCount;
-    public float Magnitude;//Generic power value of the status effect
-
-    public StatusEffectData(float duration, int stackCount, float magnitude) {
-        Duration = duration;
-        StackCount = stackCount;
-        Magnitude = magnitude;
-    }
-}
-
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\StatusEffectSystem\StatusEffectInstance.cs
-==============================
-
-using System;
-using System.Collections.Generic;
-using UnityEngine;
-
-public class StatusEffectInstance {
-    public StatusEffect StatusEffect { get; private set; }
-    public StatusEffectData EffectData { get; private set; }
-    public UnitInstance Owner { get; private set; }
-
-    public List<Action> CleanupActions = new List<Action>();
-
-    private float _tickTimer = 0f;
-    private float _durationTimer = 0f;
-    
-    public StatusEffectInstance(StatusEffect statusEffect, UnitInstance owner, StatusEffectData effectData) {
-        StatusEffect = statusEffect;
-        Owner = owner;
-        _durationTimer = effectData.Duration;
-
-        EffectData = new StatusEffectData(
-            effectData.Duration,
-            effectData.StackCount,
-            effectData.Magnitude
-        );
-    }
-
-    public void Update(float deltaTime) {
-        if (!StatusEffect.isDurationBased) return;
-
-        _durationTimer -= deltaTime;
-        if (_durationTimer <= 0) {
-            Owner.RemoveStatusEffect(StatusEffect);
-            return;
-        }
-
-        if (StatusEffect.tickInterval > 0f) {
-            _tickTimer += deltaTime;
-            if (_tickTimer >= StatusEffect.tickInterval) {
-                _tickTimer -= StatusEffect.tickInterval;
-                StatusEffect.OnTick(this);
-            }
-        }
-    }
-
-    public void AddStacks(int stackAmt) {
-        EffectData.StackCount += stackAmt;
-    }
-
-    public void Refresh() {
-        if (StatusEffect.isDurationBased) {
-            _durationTimer = EffectData.Duration;
-        }
-        
-    }
-
-    public void Apply() {
-        StatusEffect.ApplyTo(this);
-    }
-
-    public void Remove() {
-        foreach (var cleanupAction in CleanupActions) {
-            cleanupAction.Invoke();
-        }
-        CleanupActions.Clear();
-        StatusEffect.OnRemoval(this);
-    }
-    
-}
-
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\TraitSystem\Implementations\IgniteTrait.cs
-==============================
-
-using System;
-using System.Collections.Generic;
-using UnityEngine;
-
-[CreateAssetMenu(fileName = "IgniteTrait", menuName = "Traits/IgniteTrait")]
-public class IgniteTrait : Trait {
-    [SerializeField]private StatusEffect burnEffectToApply;
-    [SerializeField]private StatusEffectData effectData;
-    
-    public override void ApplyTo(TraitInstance instance) {
-        SetupBurnOnAttack(instance);
-        SetupBurnImmunity(instance);
-    }
-
-    public override void OnRemoval(TraitInstance instance) {
-        //Generally don't need to do much. Let the CleanupAction of TraitInstance handle removal.
-    }
-
-    //Will give the trait holder the ability to inflict burn to its targets when attacking
-    void SetupBurnOnAttack(TraitInstance instance) {
-        UnitInstance owner = instance.Owner;
-        Action<DamagePacket> inflictBurnToTarget = (packet) => {
-            var runtimeEffectData = new StatusEffectData(
-                effectData.Duration,
-                instance.TraitData.StackCount,
-                effectData.Magnitude
-            );
-            packet.Target?.ApplyStatusEffect(burnEffectToApply, runtimeEffectData);
-        };
-        
-        instance.Subscriptions.Bind(
-            handler: inflictBurnToTarget,
-            subscribe: handler => owner.Events.OnDamageDealt += handler,
-            unsubscribe: handler => owner.Events.OnDamageDealt -= handler
-            );
-    }
-
-    //Makes the owner immune to burn/fire damage
-    void SetupBurnImmunity(TraitInstance instance) {
-        UnitInstance owner = instance.Owner;
-        Action<DamagePacket> immuneToFireDamage = (packet) => {
-            if (packet.DamageType == DamageType.Fire) packet.IsCancelled = true;
-        };
-
-        instance.Subscriptions.Bind(
-            handler: immuneToFireDamage,
-            subscribe: handler => owner.Events.OnDamageReceiving += handler,
-            unsubscribe: handler => owner.Events.OnDamageReceiving -= handler
-        );
-    }
-}
-
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\TraitSystem\Trait.cs
-==============================
-
-using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using UnityEngine;
-
-public abstract class Trait : ScriptableObject {
-    public new string name;
-    [TextArea(3,10)]
-    public string description;
-
-    //Trait logic goes here. Subscribe to gameplay events to activate trait effects essentially
-    public abstract void ApplyTo(TraitInstance instance);
-    public virtual void OnRemoval(TraitInstance instance){}
-}
-
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\TraitSystem\TraitData.cs
-==============================
-
-[System.Serializable]
-public class TraitData {
-    public int StackCount;
-}
-
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\TraitSystem\TraitInstance.cs
-==============================
-
-using System;
-using System.Collections.Generic;
-
-public class TraitInstance {
-    private Trait _trait;
-    public Type TraitType => _trait.GetType();
-    
-    private UnitInstance _owner;
-    public UnitInstance Owner => _owner;
-    private TraitData _traitData;
-    public TraitData TraitData => _traitData;
-
-    public readonly SubscriptionManager Subscriptions = new SubscriptionManager();
-    
-    public TraitInstance(Trait trait, UnitInstance owner, TraitData traitData) {
-        _trait = trait;
-        _owner = owner;
-        _traitData = new TraitData {
-            StackCount = traitData.StackCount,
-        };
-    }
-
-    public void AddStacks(int amount) {
-        _traitData.StackCount += amount;
-    }
-
-    public void Apply() {
-        _trait?.ApplyTo(this);
-    }
-
-    public void Cleanup() {
-        Subscriptions.Dispose();
-    }
-}
-
-
-==============================
 FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\UnitSystem\HealthComponent.cs
 ==============================
 
 using System;
 using UnityEngine;
 
-public class HealthComponent : MonoBehaviour {
+public class HealthComponent : MonoBehaviour
+{
     [SerializeField] private UnitInstance _unitSelf;
-    [SerializeField]private float _currentHp;
+    [SerializeField] private float _currentHp;
     public float CurrentHp => _currentHp;
-    
-    private void Start() {
+
+    private void Start()
+    {
         _currentHp = _unitSelf.Stats.MaxHp.Value;
     }
 
-    public void TakeDamage(DamagePacket dmgPacket) {
+    public void TakeDamage(DamagePacket dmgPacket)
+    {
+        // Clone packet to ensure modifications (like armor reduction) don't affect the original sender's reference.
         DamagePacket packet = dmgPacket.Clone();
-        _unitSelf.Events.OnDamageReceiving?.Invoke(packet);
-        
-        //Once packet is manipulated.
+        // 1. Pre-calculation Event: Allow traits to modify/cancel damage (e.g., Shields, Immunity).
+        _unitSelf.Events.OnBeforeDamageReceived?.Invoke(packet);
+
         if (packet.IsCancelled) return;
-        
-        if (!packet.IsIndirect) {
+
+        // 2. Defense Calculation (Only for direct damage).
+        // Formula: Damage = Raw / Defense. (Diminishing returns logic).
+        if (!packet.IsIndirect)
+        {
             packet.DamageAmount *= 1 / _unitSelf.Stats.Defense.Value;
         }
 
         _currentHp -= packet.DamageAmount;
-        
-        if(!packet.IsIndirect) Debug.Log($"{name} received {packet.DamageAmount} damage");
-        else Debug.Log($"{name} received {packet.DamageAmount} damage. INDIRECT");
-        
+
+        if (!packet.IsIndirect) Debug.Log($"{name} received {packet.DamageAmount} damage");
+        else Debug.Log($"{name} received {packet.DamageAmount} INDIRECT damage.");
+
+        // 3. Post-calculation Event: Trigger reactions.
         _unitSelf.Events.OnDamageReceived?.Invoke(packet);
-        
-        if(_currentHp <= 0) Destroy(gameObject);
+
+        if (_currentHp <= 0) Destroy(gameObject);
     }
 }
 
@@ -544,17 +209,44 @@ public class UnitBaseConfig : ScriptableObject {
 
 
 ==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\UnitSystem\UnitController.cs
+==============================
+
+using System;
+using System.Collections;
+using System.Threading.Tasks;
+using UnityEngine;
+using PrimeTween;
+
+public class UnitController : MonoBehaviour {
+    private UnitInstance _unit;
+    public Trait trait;
+    public TraitData traitData;
+
+    private void Start() {
+        _unit = GetComponent<UnitInstance>();
+        _unit.ApplyTrait(trait, traitData);
+    }
+}
+
+
+==============================
 FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\UnitSystem\UnitEvents.cs
 ==============================
 
 using System;
 
 public class UnitEvents {
-    public Action<DamagePacket> OnDamageDealing;
-    public Action<DamagePacket> OnDamageReceiving;
+    //Why: To control data before damage is dealt/received. 
+    public Action<DamagePacket> OnBeforeDamageDealt;
+    public Action<DamagePacket> OnBeforeDamageReceived; //For ex: Cancel damage entirely
     
     public Action<DamagePacket> OnDamageDealt;
     public Action<DamagePacket> OnDamageReceived;
+    
+    //Turn based events
+    public Action OnTurnStart;
+    public Action OnTurnEnd;
     
     public Action OnDeath;
 }
@@ -571,91 +263,111 @@ using JetBrains.Annotations;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-public class UnitInstance : MonoBehaviour {
+public class UnitInstance : MonoBehaviour
+{
     [SerializeField] private UnitBaseConfig unitConfig;
-    [SerializeField]private UnitStats _stats; //The runtime changeable and latest stats of the unit.
+    [SerializeField] private UnitStats _stats; //The runtime changeable and latest stats of the unit.
     public UnitStats Stats => _stats;
-    
+
+    // Lists to track runtime logic attached to this unit.
     public List<TraitInstance> _traits = new List<TraitInstance>();
     public List<StatusEffectInstance> _statusEffects = new List<StatusEffectInstance>();
 
+    // Central event bus for this specific unit.
     public UnitEvents Events { get; private set; } = new UnitEvents();
     public HealthComponent HealthComponent { get; private set; }
     public UnitController Controller { get; private set; }
 
-    private void Awake() {
-        _stats = new UnitStats(unitConfig);
+    private void Awake()
+    {
+        _stats = new UnitStats(unitConfig); // Initialize runtime stats from config.
         Controller = GetComponent<UnitController>();
         HealthComponent = GetComponent<HealthComponent>();
     }
 
-    private void Update() {
-        UpdateStatusEffectsTimer(Time.deltaTime);
-    }
-
     #region Status Effect Management
 
-    public void ApplyStatusEffect(StatusEffect effect, StatusEffectData effectData) {
-        StatusEffectInstance existingEffect = _statusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
-        if (existingEffect != null) {
+    public void ApplyStatusEffect(StatusEffect effect, StatusEffectData effectData)
+    {
+        // Check for existing effect to stack it instead of duplicating.
+        StatusEffectInstance existingEffect =
+            _statusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
+        if (existingEffect != null)
+        {
             existingEffect.AddStacks(effectData.StackCount);
-            existingEffect.Refresh();
             return;
         }
 
+        // Create new runtime instance of the effect.
         StatusEffectInstance effectInstance = new StatusEffectInstance(effect, this, effectData);
         effectInstance.Apply();
         _statusEffects.Add(effectInstance);
     }
 
-    public void RemoveStatusEffect(StatusEffect effect) {
-        StatusEffectInstance existingEffect = _statusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
-        if (existingEffect != null) {
+    public void RemoveStatusEffect(StatusEffect effect)
+    {
+        StatusEffectInstance existingEffect =
+            _statusEffects.FirstOrDefault(eff => eff.StatusEffect.effectId == effect.effectId);
+        if (existingEffect != null)
+        {
             existingEffect.Remove();
             _statusEffects.Remove(existingEffect);
         }
     }
 
-    void UpdateStatusEffectsTimer(float deltaTime) {
-        for (int i = _statusEffects.Count - 1; i >= 0; i--) {
-            _statusEffects[i].Update(deltaTime);
-        }
-    }
+    // [IMPORTANT] -> Replace with forwarding Turn Manager's turn changes.
+    // void UpdateStatusEffectsTimer(float deltaTime) {
+    //     for (int i = _statusEffects.Count - 1; i >= 0; i--) {
+    //         _statusEffects[i].Update(deltaTime);
+    //     }
+    // }
+
     #endregion
-    
+
     #region Trait Management
-    
-    public void ApplyTrait(Trait trait, TraitData traitData) {
-        TraitInstance existingTrait =  _traits.FirstOrDefault(t => t.TraitType == trait.GetType());
+
+    // Logic mirrors Status Effects: Check for existing -> Stack or Create New.
+    public void ApplyTrait(Trait trait, TraitData traitData)
+    {
+        TraitInstance existingTrait = _traits.FirstOrDefault(t => t.TraitType == trait.GetType());
         //Check if trait is unique
-        if (existingTrait != null){
+        if (existingTrait != null)
+        {
             existingTrait.AddStacks(traitData.StackCount);
             return;
         }
+
         //If trait is unique and hasn't been added
         TraitInstance traitInstance = new TraitInstance(trait, this, traitData);
         traitInstance.Apply();
         _traits.Add(traitInstance);
     }
 
-    public void RemoveTrait(Trait trait) {
+    public void RemoveTrait(Trait trait)
+    {
         TraitInstance traitInstance = _traits.FirstOrDefault(t => t.TraitType == trait.GetType());
-        if (traitInstance != null) {
+        if (traitInstance != null)
+        {
             traitInstance.Cleanup();
             _traits.Remove(traitInstance);
         }
     }
 
     //How to handle trait removal when the object is destroyed..?
-    void HandleTraitRemoval() {
-        foreach (var traitInstance in _traits) {
+    void HandleTraitRemoval()
+    {
+        foreach (var traitInstance in _traits)
+        {
             traitInstance.Cleanup();
         }
+
         _traits.Clear();
     }
+
     #endregion
 
-    private void OnDestroy() {
+    private void OnDestroy()
+    {
         HandleTraitRemoval();
     }
 }
@@ -690,6 +402,20 @@ public class UnitStats {
 
 
 ==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\ITurnBasedUnit.cs
+==============================
+
+using System;
+
+public interface ITurnBasedUnit
+{
+    void BattleStart();
+    void TurnStart(Action<UnitController> onTurnComplete);
+    void TurnEnd();
+}
+
+
+==============================
 FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\CoreGameplay\TraitTester.cs
 ==============================
 
@@ -711,6 +437,286 @@ public class TraitTester : MonoBehaviour {
 
     public void RemoveTrait() {
         unit.RemoveTrait(igniteTrait);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\EffectsSystem\StatusEffectSystem\Implementations\BurnEffect.cs
+==============================
+
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "BurnEffect", menuName = "StatusEffects/BurnEffect")]
+public class BurnEffect : StatusEffect{
+    public override void OnTurnStart(StatusEffectInstance instance) {
+        StatusEffectData data = instance.EffectData;
+        float dmgValue = data.StackCount * data.Magnitude;
+
+        DamagePacket dmgPacket = 
+            new DamagePacket(dmgValue, null, instance.Owner)
+            .SetIndirect();
+        
+        instance.Owner.HealthComponent.TakeDamage(dmgPacket);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\EffectsSystem\StatusEffectSystem\Implementations\FrostEffect.cs
+==============================
+
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "FrostEffect", menuName = "StatusEffects/FrostEffect")]
+public class FrostEffect : StatusEffect {
+    public float slowDebuff;
+    public override void ApplyTo(StatusEffectInstance instance) {
+        instance.Owner.Stats.MoveSpeed.AddModifier(-slowDebuff, true);
+        Debug.Log($"Applied frost to {instance.Owner.name}");
+    }
+
+    public override void OnRemoval(StatusEffectInstance instance) {
+        instance.Owner.Stats.MoveSpeed.RemoveModifier(-slowDebuff, true);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\EffectsSystem\StatusEffectSystem\StatusEffect.cs
+==============================
+
+using UnityEngine;
+
+public abstract class StatusEffect : ScriptableObject
+{
+    public string effectId;
+    public new string name;
+    [TextArea(3, 10)] public string description;
+
+    public bool isDurationBased = true;
+    public float tickInterval = 1.0f;
+
+
+    public virtual void ApplyTo(StatusEffectInstance instance)
+    {
+    }
+
+    public virtual void OnTurnStart(StatusEffectInstance instance)
+    {
+    }
+
+    public virtual void OnTurnEnd(StatusEffectInstance instance)
+    {
+    }
+
+    public virtual void OnRemoval(StatusEffectInstance instance)
+    {
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\EffectsSystem\StatusEffectSystem\StatusEffectData.cs
+==============================
+
+[System.Serializable]
+public class StatusEffectData {
+    public float Duration;
+    public int StackCount;
+    public float Magnitude;//Generic power value of the status effect
+
+    public StatusEffectData(int stackCount, float magnitude) {
+        StackCount = stackCount;
+        Magnitude = magnitude;
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\EffectsSystem\StatusEffectSystem\StatusEffectInstance.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class StatusEffectInstance
+{
+    public StatusEffect StatusEffect { get; private set; }
+    public StatusEffectData EffectData { get; private set; }
+    public UnitInstance Owner { get; private set; }
+
+    public List<Action> CleanupActions = new List<Action>();
+
+
+    public StatusEffectInstance(StatusEffect statusEffect, UnitInstance owner, StatusEffectData effectData)
+    {
+        StatusEffect = statusEffect;
+        Owner = owner;
+
+        EffectData = new StatusEffectData(
+            effectData.StackCount,
+            effectData.Magnitude
+        );
+    }
+
+    public void AddStacks(int stackAmt)
+    {
+        EffectData.StackCount += stackAmt;
+    }
+
+    public void Apply()
+    {
+        StatusEffect.ApplyTo(this);
+    }
+
+    public void Remove()
+    {
+        foreach (var cleanupAction in CleanupActions)
+        {
+            cleanupAction.Invoke();
+        }
+
+        CleanupActions.Clear();
+        StatusEffect.OnRemoval(this);
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\EffectsSystem\TraitSystem\Implementations\IgniteTrait.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "IgniteTrait", menuName = "Traits/IgniteTrait")]
+public class IgniteTrait : Trait
+{
+    [SerializeField] private StatusEffect burnEffectToApply;
+    [SerializeField] private StatusEffectData effectData;
+
+    public override void ApplyTo(TraitInstance instance)
+    {
+        AddBurnOnAttackTrait(instance);
+        AddBurnImmunity(instance);
+    }
+
+    // Logic: When owner deals damage -> Apply Burn Effect to target.
+    private void AddBurnOnAttackTrait(TraitInstance instance)
+    {
+        var owner = instance.Owner;
+
+        // Define the behavior
+        Action<DamagePacket> inflictBurnToTarget = (packet) =>
+        {
+            var runtimeEffectData = new StatusEffectData(
+                instance.TraitData.StackCount, // Note: This trait uses trait stacks to determine burn power
+                effectData.Magnitude
+            );
+            packet.Target?.ApplyStatusEffect(burnEffectToApply, runtimeEffectData);
+        };
+
+        // Bind safely using SubscriptionManager
+        instance.Subscriptions.Bind(
+            inflictBurnToTarget,
+            method => owner.Events.OnDamageDealt += method,
+            method => owner.Events.OnDamageDealt -= method
+        );
+    }
+
+    // Logic: When owner receives Fire damage -> Cancel it.
+    private void AddBurnImmunity(TraitInstance instance)
+    {
+        var owner = instance.Owner;
+        Action<DamagePacket> immuneToFireDamage = (packet) =>
+        {
+            if (packet.DamageType == DamageType.Fire) packet.IsCancelled = true;
+        };
+
+        instance.Subscriptions.Bind(
+            immuneToFireDamage,
+            handler => owner.Events.OnBeforeDamageReceived += handler,
+            handler => owner.Events.OnBeforeDamageReceived -= handler
+        );
+    }
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\EffectsSystem\TraitSystem\Trait.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using UnityEngine;
+
+public abstract class Trait : ScriptableObject
+{
+    public new string name;
+    [TextArea(3, 10)] public string description;
+
+    // Entry point. Logic here should hook into UnitEvents using instance.Subscriptions.
+    public abstract void ApplyTo(TraitInstance instance);
+    // public virtual void OnRemoval(TraitInstance instance){}
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\EffectsSystem\TraitSystem\TraitData.cs
+==============================
+
+[System.Serializable]
+public class TraitData {
+    public int StackCount;
+}
+
+
+==============================
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\EffectsSystem\TraitSystem\TraitInstance.cs
+==============================
+
+using System;
+using System.Collections.Generic;
+
+public class TraitInstance
+{
+    private Trait _trait;
+    public Type TraitType => _trait.GetType();
+
+    private UnitInstance _owner;
+    public UnitInstance Owner => _owner;
+    private TraitData _traitData;
+    public TraitData TraitData => _traitData;
+
+    public readonly SubscriptionManager Subscriptions = new SubscriptionManager();
+
+    public TraitInstance(Trait trait, UnitInstance owner, TraitData traitData)
+    {
+        _trait = trait;
+        _owner = owner;
+        _traitData = new TraitData
+        {
+            StackCount = traitData.StackCount,
+        };
+    }
+
+    public void AddStacks(int amount)
+    {
+        _traitData.StackCount += amount;
+    }
+
+    public void Apply()
+    {
+        _trait?.ApplyTo(this);
+    }
+
+    public void Cleanup()
+    {
+        Subscriptions.Dispose();
     }
 }
 
@@ -974,112 +980,6 @@ public class GridSystem<TGridObject> {
 
 
 ==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\RoomSystem\BattleRoom.cs
-==============================
-
-using UnityEngine;
-
-public class BattleRoom : Room {
-    [SerializeField] private float atkBuff, maxHpBuff, movespeedBuff, defenseBuff;
-    public override void OnUnitPlaced(UnitInstance unit) {
-        unit.Stats.AttackDamage.AddModifier(atkBuff, false);
-        unit.Stats.MaxHp.AddModifier(maxHpBuff, false);
-        unit.Stats.Defense.AddModifier(defenseBuff, false);
-        unit.Stats.MoveSpeed.AddModifier(movespeedBuff, false);
-    }
-
-    public override void OnUnitRemoved(UnitInstance unit) {
-        Debug.Log($"OnUnitRemoved {unit}");
-        unit.Stats.AttackDamage.RemoveModifier(atkBuff, false);
-        unit.Stats.MaxHp.RemoveModifier(maxHpBuff, false);
-        unit.Stats.Defense.RemoveModifier(defenseBuff, false);
-        unit.Stats.MoveSpeed.RemoveModifier(movespeedBuff, false);
-    }
-}
-
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\RoomSystem\ResourceRoom.cs
-==============================
-
-using System;
-using UnityEngine;
-
-public class ResourceRoom : Room {
-    public float resourceTick = 1f;
-    public float timer = 0f;
-
-    private float harvestStrength = 1f;
-    public override void OnUnitPlaced(UnitInstance unit) {
-        harvestStrength += unit.Stats.AttackDamage.Value;
-    }
-
-    public override void OnUnitRemoved(UnitInstance unit) {
-        
-    }
-
-    private void Update() {
-        if (MyUnits.Count > 0) {
-            timer += Time.deltaTime;
-            if (timer > resourceTick) {
-                timer -= resourceTick;
-                Debug.Log($"Harvest {harvestStrength} resources every second");
-            }
-        }
-    }
-}
-
-
-==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\RoomSystem\Room.cs
-==============================
-
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using UnityEngine;
-
-public abstract class Room : MonoBehaviour {
-    protected List<UnitInstance> MyUnits = new List<UnitInstance>();
-    protected List<UnitInstance> EnemyUnits = new List<UnitInstance>();
-
-    private void Start() {
-        foreach (var unitInstance in GetComponentsInChildren<UnitInstance>()) {
-            TryPlaceUnit(unitInstance);
-        }
-    }
-
-    public abstract void OnUnitPlaced(UnitInstance unit);
-    public abstract void OnUnitRemoved(UnitInstance unit);
-
-    private async void OnTriggerEnter2D(Collider2D other) {
-        if (other.transform.TryGetComponent(out UnitInstance unit)) {
-            if (MyUnits.Contains(unit)) {
-                return;
-            }
-            await EnemyUnitEnter(unit);
-        }
-    }
-
-    public async Task EnemyUnitEnter(UnitInstance enemyUnit){
-        EnemyUnits.Add(enemyUnit);
-        foreach (var unit in MyUnits) {
-            await unit.Controller.Chase(enemyUnit);
-        }
-    }
-
-    public bool TryPlaceUnit(UnitInstance unit) {
-        if (unit == null) return false;
-        
-        MyUnits.Add(unit);
-        
-        OnUnitPlaced(unit);
-        return true;
-    }
-}
-
-
-==============================
 FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\SkillSystem\Data\StatKeys.cs
 ==============================
 
@@ -1105,36 +1005,71 @@ public static class StatusKeys {
 
 
 ==============================
-FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\UI\DragDropSystem\DropZones\RoomDropHandler.cs
+FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\TurnSystem\GlobalTurnManager.cs
 ==============================
 
 using System;
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
 
-[RequireComponent(typeof(Room))]
-public class RoomDropHandler : DropHandler{
-    private Room _room;
+public class GlobalTurnManager : MonoBehaviour
+{
+    private static GlobalTurnManager _instance;
+    public static GlobalTurnManager Instance => _instance;
 
-    private void Start() {
-        _room = GetComponent<Room>();
-    }
-
-    public override bool DropCondition(PointerEventData eventData) {
-        return (eventData.pointerDrag != null && eventData.pointerDrag.GetComponent<UnitInstance>() != null);
-    }
-
-    public override void OnDropSuccess(PointerEventData eventData) {
-        UnitInstance unit = eventData.pointerDrag.GetComponent<UnitInstance>();
-        if (unit != null && _room.TryPlaceUnit(unit)) {
-            unit.transform.SetParent(transform);
+    private void Awake()
+    {
+        if (Instance == null)
+        {
+            _instance = this;
+        }
+        else
+        {
+            Debug.LogError($"{GetType().Name} already exists, destroying.");
+            Destroy(this);
         }
     }
 
-    public override void OnPickedUp(PointerEventData eventData) {
-        UnitInstance unit = eventData.pointerDrag.GetComponent<UnitInstance>();
-        if (unit != null) {
-            _room.OnUnitRemoved(unit);
+    public enum TurnState
+    {
+        BattleStart,
+        TurnStart,
+        TurnEnd
+    }
+
+    private HashSet<ITurnBasedUnit> _turnBasedUnits = new HashSet<ITurnBasedUnit>();
+
+    public void Subscribe(ITurnBasedUnit unit){ _turnBasedUnits.Add(unit); }
+    public void UnSubscribe(ITurnBasedUnit unit) { _turnBasedUnits.Remove(unit); }
+
+    void TurnEnd(UnitController unit)
+    {
+        //Handle unit's turn end.
+        //unit.TurnEnd();
+    }
+    
+    void Manage()
+    {
+        void OnBattleStart()
+        {
+            foreach (var unit in _turnBasedUnits)
+            {
+                unit.BattleStart();
+            }
+        }
+        void OnTurnStart()
+        {
+            foreach (var unit in _turnBasedUnits)
+            {
+                unit.TurnStart(TurnEnd);
+            }
+        }
+        void OnTurnEnd()
+        {
+            foreach (var unit in _turnBasedUnits)
+            {
+                unit.TurnEnd();
+            }
         }
     }
 }
@@ -1374,19 +1309,32 @@ FILE: C:\Asesh\Unity\SkillNode\Assets\Scripts\Utilities\SubscriptionManager.cs
 using System;
 using System.Collections.Generic;
 
-public class SubscriptionManager {
+// Utility class to manage event cleanup.
+// Problem Solved: It is difficult to unsubscribe anonymous functions (lambdas) from C# events 
+// because you cannot reference them later. This class stores the unsubscribe action immediately when you bind.
+public class SubscriptionManager
+{
     private readonly List<Action> _cleanupActions = new List<Action>();
-    
-    public void Bind<T>(Action<T> handler, Action<Action<T>> subscribe, Action<Action<T>> unsubscribe) {
+
+    public void Bind<T>(Action<T> handler, Action<Action<T>> subscribe, Action<Action<T>> unsubscribe)
+    {
+        subscribe(handler); // Actually hook the event.
+        // Store the specific unsubscribe call as a closure to be executed later.
+        _cleanupActions.Add(() => unsubscribe(handler));
+    }
+    public void Bind(Action handler, Action<Action> subscribe, Action<Action> unsubscribe)
+    {
         subscribe(handler);
-        //Store unsubscription methods for when you need to dispose
         _cleanupActions.Add(() => unsubscribe(handler));
     }
 
-    public void Dispose() {
-        foreach (var cleanupAction in _cleanupActions) {
+    public void Dispose()
+    {
+        foreach (var cleanupAction in _cleanupActions)
+        {
             cleanupAction.Invoke();
         }
+
         _cleanupActions.Clear();
     }
 }

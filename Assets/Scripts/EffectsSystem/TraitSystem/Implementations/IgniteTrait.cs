@@ -3,44 +3,53 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "IgniteTrait", menuName = "Traits/IgniteTrait")]
-public class IgniteTrait : Trait {
-    [SerializeField]private StatusEffect burnEffectToApply;
-    [SerializeField]private StatusEffectData effectData;
-    
-    public override void ApplyTo(TraitInstance instance) {
-        SetupBurnOnAttack(instance);
-        SetupBurnImmunity(instance);
+public class IgniteTrait : Trait
+{
+    [SerializeField] private StatusEffect burnEffectToApply;
+    [SerializeField] private StatusEffectData effectData;
+
+    public override void ApplyTo(TraitInstance instance)
+    {
+        AddBurnOnAttackTrait(instance);
+        AddBurnImmunity(instance);
     }
 
-    //Will give the trait holder the ability to inflict burn to its targets when attacking
-    void SetupBurnOnAttack(TraitInstance instance) {
-        UnitInstance owner = instance.Owner;
-        Action<DamagePacket> inflictBurnToTarget = (packet) => {
+    // Logic: When owner deals damage -> Apply Burn Effect to target.
+    private void AddBurnOnAttackTrait(TraitInstance instance)
+    {
+        var owner = instance.Owner;
+
+        // Define the behavior
+        Action<DamagePacket> inflictBurnToTarget = (packet) =>
+        {
             var runtimeEffectData = new StatusEffectData(
-                instance.TraitData.StackCount,
+                instance.TraitData.StackCount, // Note: This trait uses trait stacks to determine burn power
                 effectData.Magnitude
             );
             packet.Target?.ApplyStatusEffect(burnEffectToApply, runtimeEffectData);
         };
-        
+
+        // Bind safely using SubscriptionManager
         instance.Subscriptions.Bind(
-            handler: inflictBurnToTarget,
-            subscribe: handler => owner.Events.OnDamageDealt += handler,
-            unsubscribe: handler => owner.Events.OnDamageDealt -= handler
-            );
+            inflictBurnToTarget,
+            method => owner.Events.OnDamageDealt += method,
+            method => owner.Events.OnDamageDealt -= method
+        );
     }
 
-    //Makes the owner immune to burn/fire damage
-    void SetupBurnImmunity(TraitInstance instance) {
-        UnitInstance owner = instance.Owner;
-        Action<DamagePacket> immuneToFireDamage = (packet) => {
+    // Logic: When owner receives Fire damage -> Cancel it.
+    private void AddBurnImmunity(TraitInstance instance)
+    {
+        var owner = instance.Owner;
+        Action<DamagePacket> immuneToFireDamage = (packet) =>
+        {
             if (packet.DamageType == DamageType.Fire) packet.IsCancelled = true;
         };
 
         instance.Subscriptions.Bind(
-            handler: immuneToFireDamage,
-            subscribe: handler => owner.Events.OnDamageReceiving += handler,
-            unsubscribe: handler => owner.Events.OnDamageReceiving -= handler
+            immuneToFireDamage,
+            handler => owner.Events.OnBeforeDamageReceived += handler,
+            handler => owner.Events.OnBeforeDamageReceived -= handler
         );
     }
 }

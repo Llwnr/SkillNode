@@ -9,8 +9,6 @@ public class UnitController : MonoBehaviour {
     public Trait trait;
     public TraitData traitData;
 
-    private bool _canAttack = true;
-
     private void Start() {
         _unit = GetComponent<UnitInstance>();
         _unit.ApplyTrait(trait, traitData);
