@@ -1,4 +1,5 @@
 ﻿using System;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using PrimeTween;
 using TMPro;
@@ -14,7 +15,7 @@ public class Popup : MonoBehaviour {
         _unit.Events.OnDamageReceived += DisplayPopup;
     }
 
-    void DisplayPopup(DamagePacket dmgPacket) {
+    UniTask DisplayPopup(DamagePacket dmgPacket) {
         TextMeshProUGUI popup = Instantiate(popupBoxPrefab, container.transform);
         popup.transform.position = Camera.main.WorldToScreenPoint(_unit.transform.position);
         
@@ -25,5 +26,7 @@ public class Popup : MonoBehaviour {
         finalHeight -= dmgPacket.IsIndirect ? 50 : 0;
         Tween.PositionY(popup.transform, endValue: finalHeight, duration: finalDuration, ease: Ease.InOutSine)
             .OnComplete(() => Destroy(popup.gameObject));
+
+        return UniTask.CompletedTask;
     }
 }

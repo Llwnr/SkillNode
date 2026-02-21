@@ -14,15 +14,15 @@ public class GridManager : MonoBehaviour {
 
     private Vector3 _offset;
 
-    public GridSystem<GridObject> Grid { get; private set; }
+    public GridSystem<Cell> Grid { get; private set; }
 
     private void Awake() {
         if (Instance != null) Destroy(gameObject);
         Instance = this;
 
         // Initialize the grid
-        Grid = new GridSystem<GridObject>(width, height, cellSize, originPosition, 
-            (GridSystem<GridObject> g, Vector2Int coords) => new GridObject(g, coords));
+        Grid = new GridSystem<Cell>(width, height, cellSize, originPosition, 
+            (GridSystem<Cell> g, Vector2Int coords) => new Cell(g, coords));
     }
 
     private void Start() {
@@ -33,7 +33,7 @@ public class GridManager : MonoBehaviour {
     //Shortcuts so you don't have to get the GridSystem itself.
     public Vector3 GetWorldPosition(Vector2Int gridPos) => Grid.GetWorldPosition(gridPos);
     public Vector2Int GetGridPosition(Vector3 worldPos) => Grid.GetGridPosition(worldPos);
-    public GridObject GetGridObject(Vector2Int gridPos) => Grid.GetGridObject(gridPos);
+    public Cell GetGridObject(Vector2Int gridPos) => Grid.GetGridObject(gridPos);
     public bool IsValidGridPosition(Vector2Int gridPos) => Grid.IsValidGridPosition(gridPos);
     #endregion
     
@@ -50,8 +50,8 @@ public class GridManager : MonoBehaviour {
 
         if (!IsTileInRange(startCoords, targetCoords, 3, false)) return;
         
-        GridObject startCell = GetGridObject(startCoords);
-        GridObject targetCell = GetGridObject(targetCoords);
+        Cell startCell = GetGridObject(startCoords);
+        Cell targetCell = GetGridObject(targetCoords);
         
         if (targetCell.IsOccupied()) {
             // Debug.LogWarning($"Cell {nearestCoordToTarget} is already occupied by {targetCell.CharacterOnTile.name}");

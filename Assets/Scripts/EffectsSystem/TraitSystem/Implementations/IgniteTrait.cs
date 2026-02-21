@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "IgniteTrait", menuName = "Traits/IgniteTrait")]
@@ -20,13 +22,17 @@ public class IgniteTrait : Trait
         var owner = instance.Owner;
 
         // Define the behavior
-        Action<DamagePacket> inflictBurnToTarget = (packet) =>
+        Func<DamagePacket, UniTask> inflictBurnToTarget = async (packet) =>
         {
             var runtimeEffectData = new StatusEffectData(
                 instance.TraitData.StackCount, // Note: This trait uses trait stacks to determine burn power
                 effectData.Magnitude
             );
             packet.Target?.ApplyStatusEffect(burnEffectToApply, runtimeEffectData);
+
+            Debug.Log("Ignite trait activated. Playing animation");
+            await UniTask.Delay(1500);
+            Debug.Log("Animation has ended");
         };
 
         // Bind safely using SubscriptionManager
@@ -41,9 +47,10 @@ public class IgniteTrait : Trait
     private void AddBurnImmunity(TraitInstance instance)
     {
         var owner = instance.Owner;
-        Action<DamagePacket> immuneToFireDamage = (packet) =>
+        Func<DamagePacket, UniTask> immuneToFireDamage = async (packet) =>
         {
             if (packet.DamageType == DamageType.Fire) packet.IsCancelled = true;
+            await Task.Delay(1);
         };
 
         instance.Subscriptions.Bind(

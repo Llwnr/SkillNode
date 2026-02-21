@@ -87,6 +87,7 @@ public class UnitInstance : MonoBehaviour
 
     public void RemoveTrait(Trait trait)
     {
+        //[IMPORTANT] Need to FIX the selection filter method
         TraitInstance traitInstance = _traits.FirstOrDefault(t => t.TraitType == trait.GetType());
         if (traitInstance != null)
         {

@@ -45,6 +45,8 @@ public class GridSystem<TGridObject> {
         if (!IsValidGridPosition(gridPos)) return default;
         return _gridArray[gridPos.x, gridPos.y];
     }
+    
+    public TGridObject GetGridObject(int x, int y) => GetGridObject(new Vector2Int(x, y));
 
     public TGridObject GetGridObject(Vector3 worldPos) {
         return GetGridObject(GetGridPosition(worldPos));

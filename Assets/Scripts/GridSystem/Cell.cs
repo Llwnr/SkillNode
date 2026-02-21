@@ -1,12 +1,12 @@
 ﻿using UnityEngine;
 
-public class GridObject {
-    private GridSystem<GridObject> _gridSystem;
+public class Cell {
+    private GridSystem<Cell> _gridSystem;
     private Vector2Int _gridCoords;
     
     public UnitInstance CharacterOnTile { get; private set; }
 
-    public GridObject(GridSystem<GridObject> gridSystem, Vector2Int coords) {
+    public Cell(GridSystem<Cell> gridSystem, Vector2Int coords) {
         _gridSystem = gridSystem;
         _gridCoords = coords;
     }
@@ -16,7 +16,7 @@ public class GridObject {
     }
 
     public void ClearCharacter() {
-        CharacterOnTile = null;
+        CharacterOnTile = default;
     }
 
     public bool IsOccupied() {

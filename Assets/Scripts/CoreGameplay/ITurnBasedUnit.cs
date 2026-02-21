@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 public interface ITurnBasedUnit
 {
-    void BattleStart();
-    void TurnStart(Action<UnitController> onTurnComplete);
-    void TurnEnd();
+    UniTask BattleStart();
+    UniTask TurnStart();
+    UniTask TurnEnd();
 }

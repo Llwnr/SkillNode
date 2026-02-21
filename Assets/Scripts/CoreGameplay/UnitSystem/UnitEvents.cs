@@ -1,16 +1,18 @@
 ﻿using System;
+using Cysharp.Threading.Tasks;
 
 public class UnitEvents {
     //Why: To control data before damage is dealt/received. 
-    public Action<DamagePacket> OnBeforeDamageDealt;
-    public Action<DamagePacket> OnBeforeDamageReceived; //For ex: Cancel damage entirely
+    public Func<DamagePacket, UniTask> OnBeforeDamageDealt;
+    public Func<DamagePacket, UniTask> OnBeforeDamageReceived; //For ex: Cancel damage entirely
     
-    public Action<DamagePacket> OnDamageDealt;
-    public Action<DamagePacket> OnDamageReceived;
+    public Func<DamagePacket, UniTask> OnDamageDealt;
+    public Func<DamagePacket, UniTask> OnDamageReceived;
     
     //Turn based events
-    public Action OnTurnStart;
-    public Action OnTurnEnd;
+    public Func<UniTask> OnBattleStart;
+    public Func<UniTask> OnTurnStart;
+    public Func<UniTask> OnTurnEnd;
     
-    public Action OnDeath;
+    public Func<UniTask> OnDeath;
 }
